@@ -115,8 +115,7 @@ create table if not exists swarm_predictions (
 );
 
 create index if not exists predictions_hash_idx
-  on swarm_predictions (query_hash, user_id)
-  where expires_at > now();
+  on swarm_predictions (query_hash, user_id);
 
 -- ── RLS untuk tabel baru ───────────────────────────────
 alter table bot_connections   enable row level security;
