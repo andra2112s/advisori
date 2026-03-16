@@ -1,0 +1,43 @@
+{
+  "name": "advisori",
+  "version": "1.0.0",
+  "description": "Advisori — AI Personal Platform",
+  "type": "module",
+  "scripts": {
+    "dev:api": "node --watch backend/server.js",
+    "dev:frontend": "vite",
+    "dev:bot": "node --watch bot/index.js",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\" \"npm run dev:bot\"",
+    "build": "vite build",
+    "start": "node backend/server.js",
+    "start:bot": "node bot/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^9.0.0",
+    "@hapi/boom": "^10.0.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@whiskeysockets/baileys": "^6.7.0",
+    "axios": "^1.13.6",
+    "bcryptjs": "^2.4.3",
+    "concurrently": "^9.0.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^5.8.2",
+    "framer-motion": "^12.36.0",
+    "lucide-react": "^0.577.0",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "node-telegram-bot-api": "^0.66.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.1",
+    "vite": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
