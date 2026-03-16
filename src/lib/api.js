@@ -64,6 +64,15 @@ export const api = {
   getMySkills: () => req('/shop/my-skills'),
   activate:    (id) => req(`/shop/activate/${id}`, { method: 'POST' }),
 
+  // Bots — per user connections
+  getBots:             ()           => req('/bots'),
+  connectTelegram:     (data)       => req('/bots/telegram/connect',   { method: 'POST', body: data }),
+  disconnectTelegram:  ()           => req('/bots/telegram/disconnect', { method: 'POST' }),
+  connectWhatsApp:     (data)       => req('/bots/whatsapp/connect',   { method: 'POST', body: data }),
+  disconnectWhatsApp:  ()           => req('/bots/whatsapp/disconnect', { method: 'POST' }),
+  getWhatsAppQR:       ()           => req('/bots/whatsapp/qr'),
+  updateBotBranding:   (pl, data)   => req(`/bots/${pl}/branding`,     { method: 'PATCH', body: data }),
+
   // Streaming chat — returns ReadableStream
   streamChat: async (message, advisorId) => {
     const token = getToken()
