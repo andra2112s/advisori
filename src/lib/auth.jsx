@@ -85,8 +85,11 @@ export function AuthProvider({ children }) {
 
   const refreshSoul = async () => {
     const data = await api.me()
-    setSoul(data.soul)
-    return data.soul
+    if (data && data.soul) {
+      setSoul(data.soul)
+      return data.soul
+    }
+    return null
   }
 
   return (

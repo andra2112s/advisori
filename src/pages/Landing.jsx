@@ -8,7 +8,7 @@ export default function Landing() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (user) navigate(soul?.isSetup ? '/chat' : '/soul-setup')
+    if (user) navigate(soul?.is_setup ? '/chat' : '/soul-setup')
   }, [user, soul])
 
   return (

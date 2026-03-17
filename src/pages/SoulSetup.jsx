@@ -48,7 +48,8 @@ export default function SoulSetup() {
   const save = async () => {
     setSaving(true)
     try {
-      await api.setupSoul({
+      console.log('Saving soul data:', soul)
+      const response = await api.setupSoul({
         name: soul.name,
         personality: personalityStr,
         speakingStyle: soul.speakingStyle,
@@ -57,9 +58,24 @@ export default function SoulSetup() {
         avatar: soul.avatar,
         language: 'id',
       })
-      await refreshSoul()
-      navigate('/chat')
+      console.log('Save response:', response)
+      
+      // Wait a bit for the database to update
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Refresh soul data
+      const refreshedSoul = await refreshSoul()
+      console.log('Refreshed soul:', refreshedSoul)
+      
+      // Check if soul is properly set up
+      if (refreshedSoul?.is_setup) {
+        navigate('/chat')
+      } else {
+        console.error('Soul not marked as setup:', refreshedSoul)
+        alert('Terjadi kesalahan. Silakan coba lagi.')
+      }
     } catch (err) {
+      console.error('Save error:', err)
       alert(err.message)
     } finally {
       setSaving(false)

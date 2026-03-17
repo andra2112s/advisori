@@ -20,7 +20,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      navigate(soul?.isSetup ? '/chat' : '/soul-setup')
+      navigate(soul?.is_setup ? '/chat' : '/soul-setup')
     }
   }, [user, soul, authLoading, navigate])
 

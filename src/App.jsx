@@ -26,7 +26,7 @@ function SoulRoute({ children }) {
     </div>
   )
   if (!user) return <Navigate to="/login" replace />
-  if (!soul?.isSetup) return <Navigate to="/soul-setup" replace />
+  if (!soul?.is_setup) return <Navigate to="/soul-setup" replace />
   return children
 }
 

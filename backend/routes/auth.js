@@ -129,7 +129,7 @@ export default async function authRoutes(app) {
         name: soul.name,
         personality: soul.personality,
         avatar: soul.avatar,
-        isSetup: soul.is_setup,
+        is_setup: soul.is_setup,
       } : null,
     });
   });

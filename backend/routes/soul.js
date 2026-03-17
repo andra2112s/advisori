@@ -80,7 +80,13 @@ export default async function soulRoutes(app) {
       soul = data;
     }
 
-    reply.send({ soul, ok: true });
+    reply.send({ 
+      soul: {
+        ...soul,
+        is_setup: soul.is_setup
+      }, 
+      ok: true 
+    });
   });
 
   // ── Update memory (dipanggil otomatis oleh AI) ────────
