@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const API = process.env.BACKEND_URL || 'http://localhost:4000';
+const API = process.env.BACKEND_URL || 'http://localhost:4001';
 
 // ─── Helper: call backend API ────────────────────────
 async function callChat(userToken, message, advisorId) {
@@ -63,13 +63,36 @@ function formatForBot(text) {
 // ══════════════════════════════════════════════════════
 // TELEGRAM BOT
 // ══════════════════════════════════════════════════════
-export function startTelegramBot() {
+export async function startTelegramBot() {
   if (!process.env.TELEGRAM_BOT_TOKEN) {
     console.log('⚠️  TELEGRAM_BOT_TOKEN tidak ada, Telegram bot dilewati');
     return;
   }
 
   const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+  // Handle polling errors gracefully
+  bot.on('polling_error', (error) => {
+    if (error.code === 'ETELEGRAM') {
+      console.log('❌ Telegram bot stopped - Invalid token or unauthorized access');
+      console.log('⚠️  Please check your TELEGRAM_BOT_TOKEN in .env file');
+      // Stop the bot gracefully
+      bot.stopPolling();
+      return;
+    }
+    console.error('🤖 Telegram polling error:', error.message);
+  });
+
+  // Test bot connection first
+  try {
+    await bot.getMe();
+    console.log('✅ Telegram bot running');
+  } catch (error) {
+    console.log('❌ Telegram bot failed - Invalid token or network error');
+    console.log('⚠️  Telegram bot skipped - Check your TELEGRAM_BOT_TOKEN');
+    bot.stopPolling();
+    return;
+  }
 
   // State: user sedang "typing" indicator
   const typing = new Set();
@@ -215,7 +238,13 @@ export async function startWhatsAppBot() {
         : true;
       if (shouldReconnect) startWhatsAppBot();
     } else if (connection === 'open') {
-      console.log('✅ WhatsApp bot connected');
+      console.log('🚀 All bot services started!');
+
+// Handle unhandled promise rejections to prevent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🤖 Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit process, just log the error
+});
     }
   });
 

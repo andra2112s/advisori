@@ -123,6 +123,13 @@ alter table paperclip_agents  enable row level security;
 alter table agent_tasks       enable row level security;
 alter table swarm_predictions enable row level security;
 
+-- Drop existing policies if they exist (safe to run multiple times)
+drop policy if exists "bot_conn_owner" on bot_connections;
+drop policy if exists "agents_owner" on paperclip_agents;
+drop policy if exists "tasks_owner" on agent_tasks;
+drop policy if exists "predictions_owner" on swarm_predictions;
+
+-- Create policies
 create policy "bot_conn_owner"   on bot_connections   for all using (auth.uid()::text = user_id::text);
 create policy "agents_owner"     on paperclip_agents  for all using (auth.uid()::text = user_id::text);
 create policy "tasks_owner"      on agent_tasks       for all using (auth.uid()::text = user_id::text);

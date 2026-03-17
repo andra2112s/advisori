@@ -16,6 +16,7 @@ import webhookRoutes from './routes/webhook.js';
 import botRoutes from './routes/bots.js';
 import { restoreAllConnections } from './services/botManager.js';
 import { startPaperclip } from './services/paperclip.js';
+import jwksRsa from 'jwks-rsa';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,10 +35,11 @@ const app = Fastify({ logger: true });
 // ─── Plugins ─────────────────────────────────────────
 await app.register(cors, {
   origin: [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    'http://localhost:3000',
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:5500',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
     'http://127.0.0.1:5500',
   ],
   credentials: true,
@@ -58,12 +60,31 @@ const getJwtSecret = () => {
   }
 };
 
+const jwksClient = jwksRsa({
+  cache: true,
+  rateLimit: true,
+  jwksRequestsPerMinute: 5,
+  jwksUri: `${process.env.SUPABASE_URL}/.well-known/jwks.json`,
+});
+
 await app.register(jwt, {
-  secret: getJwtSecret(),
+  secret: (req, token, cb) => {
+    const { header } = token;
+    // For our own HS256 tokens
+    if (header.alg === 'HS256') {
+      return cb(null, getJwtSecret());
+    }
+    // For Supabase's ES256 tokens
+    if (header.alg === 'ES256') {
+      return jwksClient.getSigningKey(header.kid, (err, key) => {
+        if (err) return cb(err);
+        const signingKey = key.getPublicKey();
+        return cb(null, signingKey);
+      });
+    }
+    cb(new Error('Unsupported token algorithm'));
+  },
   formatUser: (user) => user,
-  verify: {
-    algorithms: ['HS256']
-  }
 });
 
 await app.register(rateLimit, {
