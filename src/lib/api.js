@@ -1,4 +1,4 @@
-const BASE = '/api'  // Vite proxy ke localhost:4000
+const BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:4001/api'
 
 function getToken() {
   return localStorage.getItem('advisori_token')

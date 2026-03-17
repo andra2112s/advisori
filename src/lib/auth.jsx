@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { api } from './api'
 import { supabase } from './supabase'
 
@@ -8,6 +8,27 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
   const [soul, setSoul]       = useState(null)
   const [loading, setLoading] = useState(true)
+
+  const syncUser = useCallback(() => {
+    setLoading(true)
+    api.me()
+      .then(data => {
+        if (data && data.user) {
+          setUser(data.user)
+          setSoul(data.soul)
+        } else {
+          setUser(null)
+          setSoul(null)
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('advisori_token')
+        localStorage.removeItem('advisori_user')
+        setUser(null)
+        setSoul(null)
+      })
+      .finally(() => setLoading(false))
+  }, [])
 
   useEffect(() => {
     // 1. Check current session from Supabase (for OAuth)
@@ -36,28 +57,7 @@ export function AuthProvider({ children }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
-
-  const syncUser = () => {
-    setLoading(true)
-    api.me()
-      .then(data => {
-        if (data && data.user) {
-          setUser(data.user)
-          setSoul(data.soul)
-        } else {
-          setUser(null)
-          setSoul(null)
-        }
-      })
-      .catch(() => {
-        localStorage.removeItem('advisori_token')
-        localStorage.removeItem('advisori_user')
-        setUser(null)
-        setSoul(null)
-      })
-      .finally(() => setLoading(false))
-  }
+  }, [syncUser])
 
   const login = async (email, password) => {
     const data = await api.login({ email, password })

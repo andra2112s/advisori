@@ -71,11 +71,14 @@ await app.register(rateLimit, {
   keyGenerator: (req) => req.user?.id || req.ip,
 });
 
-// Serve static files from frontend directory
-await app.register(staticPlugin, {
-  root: path.join(__dirname, '../frontend'),
-  prefix: '/',
-});
+// Static files are served by Vite dev server in development
+// In production, serve from dist folder
+if (process.env.NODE_ENV === 'production') {
+  await app.register(staticPlugin, {
+    root: path.join(__dirname, '../dist'),
+    prefix: '/',
+  });
+}
 
 // ─── Auth decorator ──────────────────────────────────
 app.decorate('authenticate', async (req, reply) => {
