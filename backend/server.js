@@ -13,6 +13,9 @@ import chatRoutes from './routes/chat.js';
 import soulRoutes from './routes/soul.js';
 import shopRoutes from './routes/shop.js';
 import webhookRoutes from './routes/webhook.js';
+import botRoutes from './routes/bots.js';
+import { restoreAllConnections } from './services/botManager.js';
+import { startPaperclip } from './services/paperclip.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -200,6 +203,7 @@ app.register(chatRoutes,    { prefix: '/api/chat' });
 app.register(soulRoutes,    { prefix: '/api/soul' });
 app.register(shopRoutes,    { prefix: '/api/shop' });
 app.register(webhookRoutes, { prefix: '/api/webhook' });
+app.register(botRoutes,     { prefix: '/api/bots' });
 
 // Health check
 app.get('/health', async () => ({ status: 'ok', ts: Date.now() }));
@@ -209,6 +213,10 @@ const PORT = process.env.PORT || 4000;
 try {
   await app.listen({ port: PORT, host: '0.0.0.0' });
   console.log(`\n🦞 Advisori backend running on port ${PORT}\n`);
+  
+  // Restore bot connections and start Paperclip
+  await restoreAllConnections();
+  startPaperclip();
 } catch (err) {
   app.log.error(err);
   process.exit(1);
