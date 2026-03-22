@@ -4,18 +4,15 @@ export default async function soulRoutes(app) {
 
   // ── Get soul user ────────────────────────────────────
   app.get('/', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
-    // Use test user ID if no authenticated user
-    const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0'; // test4@example.com's ID
-    
     const { data: soul } = await supabase
       .from('souls')
       .select('*')
-      .eq('user_id', testUserId)
+      .eq('user_id', req.user.id)
       .single();
 
-    app.log.info(`Getting soul for user ${testUserId}:`, soul ? 'found' : 'not found');
+    app.log.info(`Getting soul for user ${req.user.id}:`, soul ? 'found' : 'not found');
     if (soul) app.log.info(`Soul setup status: ${soul.is_setup}, name: ${soul.name}`);
 
     reply.send({ soul: soul || null });
@@ -25,50 +22,50 @@ export default async function soulRoutes(app) {
   // Ini dipanggil saat user onboarding pertama kali
   // atau saat edit kepribadian AI Personal
   app.post('/setup', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
     schema: {
       body: {
         type: 'object',
-        required: ['name', 'personality', 'speakingStyle'],
+        required: ['name', 'speakingStyle'],
         properties: {
           name:         { type: 'string', minLength: 1, maxLength: 50 },
-          personality:  { type: 'string', minLength: 1, maxLength: 500 },
+          personality:  { type: ['string', 'array'], maxLength: 500 },
           speakingStyle:{ type: 'string', minLength: 1, maxLength: 200 },
           backstory:    { type: 'string', maxLength: 1000 },
           values:       { type: 'array', items: { type: 'string' }, maxItems: 10 },
           quirks:       { type: 'array', items: { type: 'string' }, maxItems: 10 },
           avatar:       { type: 'string', maxLength: 200 },
           language:     { type: 'string', enum: ['id', 'en', 'mix'] },
-          // aiProvider:   { type: 'string', enum: ['claude', 'zai'], default: 'claude' }, // Column doesn't exist
         }
       }
     }
   }, async (req, reply) => {
     const {
       name, personality, speakingStyle,
-      backstory, values, quirks, avatar, language, aiProvider
+      backstory, values, quirks, avatar, language
     } = req.body;
 
-    // Use test user ID if no authenticated user
-    const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0'; // test4@example.com's ID
+    // Handle personality as array or string
+    const personalityStr = Array.isArray(personality) ? personality.join(', ') : personality;
+
+    const userId = req.user.id;
     
     const { data: existing } = await supabase
       .from('souls')
       .select('id')
-      .eq('user_id', testUserId)
+      .eq('user_id', userId)
       .single();
 
     const soulData = {
-      user_id: testUserId,
+      user_id: userId,
       name,
-      personality,
+      personality: personalityStr || personality,
       speaking_style: speakingStyle,
       backstory: backstory || null,
       values: values || [],
       quirks: quirks || [],
       avatar: avatar || '✦',
       language: language || 'id',
-      // ai_provider: aiProvider || 'claude', // Column doesn't exist
       is_setup: true,
       updated_at: new Date().toISOString(),
     };
@@ -80,7 +77,7 @@ export default async function soulRoutes(app) {
       const { data, error: updateError } = await supabase
         .from('souls')
         .update(soulData)
-        .eq('user_id', testUserId)
+        .eq('user_id', userId)
         .select()
         .single();
       soul = data;

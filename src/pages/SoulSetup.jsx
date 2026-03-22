@@ -64,16 +64,10 @@ export default function SoulSetup() {
       await new Promise(resolve => setTimeout(resolve, 500))
       
       // Refresh soul data
-      const refreshedSoul = await refreshSoul()
-      console.log('Refreshed soul:', refreshedSoul)
+      await refreshSoul()
       
-      // Check if soul is properly set up
-      if (refreshedSoul?.is_setup) {
-        navigate('/channels')
-      } else {
-        console.error('Soul not marked as setup:', refreshedSoul)
-        alert('Terjadi kesalahan. Silakan coba lagi.')
-      }
+      // Navigate to channels on success
+      navigate('/channels')
     } catch (err) {
       console.error('Save error:', err)
       alert(err.message)

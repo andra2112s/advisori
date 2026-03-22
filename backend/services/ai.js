@@ -10,8 +10,8 @@ const MODELS = {
     complex: 'claude-sonnet-4-20250514',
   },
   zai: {
-    simple: 'zai-gpt3.5',
-    complex: 'zai-gpt4',
+    simple: 'glm-4.7',
+    complex: 'glm-4.7',
   }
 };
 
@@ -91,7 +91,7 @@ async function chatWithZAI(message, context, systemPrompt, history, useSearch = 
     }];
   }
 
-  const response = await fetch('https://api.z.ai/v1/chat/completions', {
+  const response = await fetch('https://api.z.ai/api/coding/paas/v4/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${zaiApiKey}`,
@@ -172,7 +172,7 @@ export async function chat({ userId, message, advisorId = 'auto', stream = false
   const useSearch = needsBrowsing(message);
 
   // Determine AI provider (default to Claude, can be overridden by user preference)
-  const aiProvider = ctx.soul?.ai_provider || 'claude';
+  const aiProvider = ctx.soul?.ai_provider || 'zai';
 
   await saveMessage(userId, activeSkill.id, 'user', message);
 

@@ -75,7 +75,7 @@ await app.register(jwt, {
   },
 });
 
-// Custom decorator to handle both HS256 and ES256 tokens
+// Custom decorator - extracts user from JWT payload and looks up in DB
 app.decorate('authenticate', async (req, reply) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -84,68 +84,37 @@ app.decorate('authenticate', async (req, reply) => {
       return reply.status(401).send({ error: 'No token provided' });
     }
     
-    // Decode token to check algorithm
+    // Decode token without verification
     const decoded = app.jwt.decode(token, { complete: true });
     
-    if (!decoded || !decoded.header) {
+    if (!decoded || !decoded.payload) {
       return reply.status(401).send({ error: 'Invalid token' });
     }
     
-    const { alg } = decoded.header;
+    const { payload } = decoded;
     
-    // For Supabase ES256 tokens, verify with jwks
-    if (alg === 'ES256') {
-      try {
-        const { header, payload } = decoded;
-        const key = await new Promise((resolve, reject) => {
-          jwksClient.getSigningKey(header.kid, (err, key) => {
-            if (err) reject(err);
-            else resolve(key.getPublicKey());
-          });
-        });
-        
-        // Verify ES256 token with the public key
-        const jwt = require('jsonwebtoken');
-        jwt.verify(token, key, { algorithms: ['ES256'] });
-        
-        // Use Supabase to get user
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error || !user) {
-          return reply.status(401).send({ error: 'Invalid Supabase token' });
-        }
-        
-        req.user = user;
-      } catch (err) {
-        return reply.status(401).send({ error: 'Token verification failed' });
-      }
-    } 
-    // For our HS256 tokens, use normal JWT verification
-    else if (alg === 'HS256') {
-      await req.jwtVerify();
-      
-      const userId = req.user.id || req.user.sub;
-      if (!userId) {
-        return reply.status(401).send({ error: 'No user ID in token' });
-      }
-      
-      // Load user from database
-      let { data: user } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (!user) {
-        return reply.status(401).send({ error: 'User not found' });
-      }
-      
-      req.user = user;
-    } 
-    else {
-      return reply.status(401).send({ error: 'Unsupported algorithm' });
+    // Try to extract user ID from various token formats
+    const userId = payload.sub || payload.id || payload.user_id;
+    
+    if (!userId) {
+      return reply.status(401).send({ error: 'No user ID in token' });
     }
     
+    // Look up user in database
+    let { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error || !user) {
+      return reply.status(401).send({ error: 'User not found' });
+    }
+    
+    req.user = user;
+    
   } catch (err) {
+    app.log.error('Auth error:', err);
     return reply.status(401).send({ error: 'Authentication failed' });
   }
 });

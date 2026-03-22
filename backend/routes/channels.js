@@ -3,15 +3,12 @@ import { supabase } from '../config.js';
 export default async function channelsRoutes(app) {
   // Get user's channel connections
   app.get('/connections', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
-    // Use hardcoded user ID for testing (replace with actual user ID from your database)
-    const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0'; // test4@example.com's ID
-    
     const { data, error } = await supabase
       .from('channel_connections')
       .select('*')
-      .eq('user_id', testUserId);
+      .eq('user_id', req.user.id);
 
     if (error) {
       return reply.code(500).send({ error: error.message });
@@ -22,12 +19,11 @@ export default async function channelsRoutes(app) {
 
   // Generate WhatsApp QR code
   app.post('/whatsapp/qr', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const whatsappChannel = app.channels.get('whatsapp');
-      const qr = await whatsappChannel.generateQR(testUserId);
+      const qr = await whatsappChannel.generateQR(req.user.id);
       reply.send({ qr });
     } catch (error) {
       reply.code(500).send({ error: error.message });
@@ -36,12 +32,11 @@ export default async function channelsRoutes(app) {
 
   // Connect WhatsApp
   app.post('/whatsapp/connect', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const whatsappChannel = app.channels.get('whatsapp');
-      const result = await whatsappChannel.connectUser(testUserId);
+      const result = await whatsappChannel.connectUser(req.user.id);
       reply.send(result);
     } catch (error) {
       reply.code(500).send({ error: error.message });
@@ -50,12 +45,11 @@ export default async function channelsRoutes(app) {
 
   // Disconnect WhatsApp
   app.post('/whatsapp/disconnect', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const whatsappChannel = app.channels.get('whatsapp');
-      await whatsappChannel.disconnect(testUserId);
+      await whatsappChannel.disconnect(req.user.id);
       reply.send({ success: true });
     } catch (error) {
       reply.code(500).send({ error: error.message });
@@ -64,17 +58,16 @@ export default async function channelsRoutes(app) {
 
   // Connect Telegram
   app.post('/telegram/connect', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const { botToken } = req.body;
       if (!botToken) {
         return reply.code(400).send({ error: 'Bot token required' });
       }
 
       const telegramChannel = app.channels.get('telegram');
-      const result = await telegramChannel.connectUser(testUserId, botToken);
+      const result = await telegramChannel.connectUser(req.user.id, botToken);
       reply.send(result);
     } catch (error) {
       reply.code(500).send({ error: error.message });
@@ -83,12 +76,11 @@ export default async function channelsRoutes(app) {
 
   // Disconnect Telegram
   app.post('/telegram/disconnect', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const telegramChannel = app.channels.get('telegram');
-      await telegramChannel.disconnect(testUserId);
+      await telegramChannel.disconnect(req.user.id);
       reply.send({ success: true });
     } catch (error) {
       reply.code(500).send({ error: error.message });
@@ -97,17 +89,16 @@ export default async function channelsRoutes(app) {
 
   // Connect Discord
   app.post('/discord/connect', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const { botToken } = req.body;
       if (!botToken) {
         return reply.code(400).send({ error: 'Bot token required' });
       }
 
       const discordChannel = app.channels.get('discord');
-      const result = await discordChannel.connectUser(testUserId, botToken);
+      const result = await discordChannel.connectUser(req.user.id, botToken);
       reply.send(result);
     } catch (error) {
       reply.code(500).send({ error: error.message });
@@ -116,12 +107,11 @@ export default async function channelsRoutes(app) {
 
   // Disconnect Discord
   app.post('/discord/disconnect', {
-    // preHandler: [app.authenticate], // Temporarily disabled for testing
+    preHandler: [app.authenticate],
   }, async (req, reply) => {
     try {
-      const testUserId = req.user?.id || '5d3b8c9e-7756-498b-a14c-26c87d4ad7e0';
       const discordChannel = app.channels.get('discord');
-      await discordChannel.disconnect(testUserId);
+      await discordChannel.disconnect(req.user.id);
       reply.send({ success: true });
     } catch (error) {
       reply.code(500).send({ error: error.message });

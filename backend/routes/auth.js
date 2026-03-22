@@ -115,9 +115,77 @@ export default async function authRoutes(app) {
   app.get('/me', {
     preHandler: [app.authenticate],
   }, async (req, reply) => {
+    const { data: soul } = await supabase
+      .from('souls')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .single();
+    
     reply.send({
       user: req.user,
-      soul: null,
+      soul: soul || null,
+    });
+  });
+
+  // ── OAuth Callback ──────────────────────────────────
+  app.post('/oauth-callback', async (req, reply) => {
+    const { provider, user: oauthUser } = req.body;
+    
+    if (!oauthUser?.email) {
+      return reply.status(400).send({ error: 'Invalid OAuth data' });
+    }
+    
+    // Check if user exists
+    let { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', oauthUser.email)
+      .single();
+    
+    // Create user if not exists
+    if (!user) {
+      const { data: newUser, error } = await supabase
+        .from('users')
+        .insert({
+          email: oauthUser.email,
+          name: oauthUser.user_metadata?.full_name || oauthUser.email.split('@')[0],
+          password_hash: 'OAUTH_' + provider, // Placeholder for OAuth users
+          tier: 'free',
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      
+      if (error || !newUser) {
+        return reply.status(500).send({ error: 'Gagal membuat akun OAuth' });
+      }
+      
+      user = newUser;
+      
+      // Create default soul
+      await supabase.from('souls').insert({
+        user_id: user.id,
+        name: 'Aria',
+        personality: 'warm, direct, intelligent',
+        speaking_style: 'conversational bahasa Indonesia',
+        backstory: null,
+        values: ['kejujuran', 'kejelasan', 'kepraktisan'],
+        quirks: [],
+        avatar: '✦',
+        memory: { episodic: [], semantic: {}, preferences: {} },
+        is_setup: false,
+      });
+    }
+    
+    const token = app.jwt.sign(
+      { id: user.id, email: user.email },
+      { expiresIn: '30d' }
+    );
+    
+    reply.send({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, tier: user.tier },
+      soulReady: false,
     });
   });
 
@@ -125,7 +193,6 @@ export default async function authRoutes(app) {
   app.post('/logout', {
     preHandler: [app.authenticate],
   }, async (req, reply) => {
-    // JWT stateless — client hapus token
     reply.send({ ok: true });
   });
 }
