@@ -1,7 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import cron from 'node-cron'
-import { supabase } from '../server.js'
+import { supabase } from '../config.js'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,

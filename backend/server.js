@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+// Auto-restart trigger
 
 import authRoutes from './routes/auth.js';
 import chatRoutes from './routes/chat.js';
@@ -14,9 +15,14 @@ import soulRoutes from './routes/soul.js';
 import shopRoutes from './routes/shop.js';
 import webhookRoutes from './routes/webhook.js';
 import botRoutes from './routes/bots.js';
+import channelsRoutes from './routes/channels.js';
 import { restoreAllConnections } from './services/botManager.js';
 import { startPaperclip } from './services/paperclip.js';
 import jwksRsa from 'jwks-rsa';
+import channelManager from './services/channelManager.js';
+import WhatsAppChannel from './channels/whatsapp.js';
+import TelegramChannel from './channels/telegram.js';
+import DiscordChannel from './channels/discord.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,18 +52,10 @@ await app.register(cors, {
 });
 
 // ─── JWT Registration ───────────────────────────────
-// Supabase JWT secret is base64 encoded.
 const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) return 'super-secret-key';
-  
-  // Supabase secrets are 64-byte base64 strings.
-  // We must decode them to Buffer for HS256 to work correctly.
-  try {
-    return Buffer.from(secret, 'base64');
-  } catch (e) {
-    return secret;
-  }
+  return secret;
 };
 
 const jwksClient = jwksRsa({
@@ -68,23 +66,88 @@ const jwksClient = jwksRsa({
 });
 
 await app.register(jwt, {
-  secret: (req, token, cb) => {
-    const { header } = token;
-    // For our own HS256 tokens
-    if (header.alg === 'HS256') {
-      return cb(null, getJwtSecret());
-    }
-    // For Supabase's ES256 tokens
-    if (header.alg === 'ES256') {
-      return jwksClient.getSigningKey(header.kid, (err, key) => {
-        if (err) return cb(err);
-        const signingKey = key.getPublicKey();
-        return cb(null, signingKey);
-      });
-    }
-    cb(new Error('Unsupported token algorithm'));
+  secret: getJwtSecret(),
+  decode: {
+    complete: true,
   },
-  formatUser: (user) => user,
+  sign: {
+    algorithm: 'HS256',
+  },
+});
+
+// Custom decorator to handle both HS256 and ES256 tokens
+app.decorate('authenticate', async (req, reply) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return reply.status(401).send({ error: 'No token provided' });
+    }
+    
+    // Decode token to check algorithm
+    const decoded = app.jwt.decode(token, { complete: true });
+    
+    if (!decoded || !decoded.header) {
+      return reply.status(401).send({ error: 'Invalid token' });
+    }
+    
+    const { alg } = decoded.header;
+    
+    // For Supabase ES256 tokens, verify with jwks
+    if (alg === 'ES256') {
+      try {
+        const { header, payload } = decoded;
+        const key = await new Promise((resolve, reject) => {
+          jwksClient.getSigningKey(header.kid, (err, key) => {
+            if (err) reject(err);
+            else resolve(key.getPublicKey());
+          });
+        });
+        
+        // Verify ES256 token with the public key
+        const jwt = require('jsonwebtoken');
+        jwt.verify(token, key, { algorithms: ['ES256'] });
+        
+        // Use Supabase to get user
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+          return reply.status(401).send({ error: 'Invalid Supabase token' });
+        }
+        
+        req.user = user;
+      } catch (err) {
+        return reply.status(401).send({ error: 'Token verification failed' });
+      }
+    } 
+    // For our HS256 tokens, use normal JWT verification
+    else if (alg === 'HS256') {
+      await req.jwtVerify();
+      
+      const userId = req.user.id || req.user.sub;
+      if (!userId) {
+        return reply.status(401).send({ error: 'No user ID in token' });
+      }
+      
+      // Load user from database
+      let { data: user } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (!user) {
+        return reply.status(401).send({ error: 'User not found' });
+      }
+      
+      req.user = user;
+    } 
+    else {
+      return reply.status(401).send({ error: 'Unsupported algorithm' });
+    }
+    
+  } catch (err) {
+    return reply.status(401).send({ error: 'Authentication failed' });
+  }
 });
 
 await app.register(rateLimit, {
@@ -104,101 +167,6 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// ─── Auth decorator ──────────────────────────────────
-app.decorate('authenticate', async (req, reply) => {
-  try {
-    // 1. Verify JWT
-    try {
-      // Log token header for debugging (Safe, as it's not the secret)
-      const token = req.headers.authorization?.split(' ')[1];
-      if (token) {
-        const decoded = app.jwt.decode(token, { complete: true });
-        if (decoded) {
-          app.log.info(`Token alg: ${decoded.header.alg}, sub: ${decoded.payload.sub}`);
-        }
-      }
-
-      await req.jwtVerify();
-    } catch (err) {
-      app.log.warn(`JWT Verification failed: ${err.message}`);
-      // Add more detail for debugging
-      const token = req.headers.authorization?.split(' ')[1];
-      if (token) {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          try {
-            const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
-            app.log.info(`Token header info: alg=${header.alg}, typ=${header.typ}`);
-          } catch (e) {}
-        }
-      }
-      return reply.status(401).send({ error: `Unauthorized: ${err.message}` });
-    }
-
-    if (!req.user) {
-      return reply.status(401).send({ error: 'Unauthorized: No user info in token' });
-    }
-
-    const userId = req.user.id || req.user.sub;
-    if (!userId) {
-      return reply.status(401).send({ error: 'Unauthorized: No user ID in token' });
-    }
-
-    // 2. Load user dari tabel 'users' kita
-    let { data: user } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    // Jika user tidak ditemukan di tabel kita, mungkin dia baru login via OAuth (Supabase Auth)
-    if (!user) {
-      // Ambil detail user dari Supabase Auth Admin API
-      const { data: { user: sbUser }, error: sbError } = await supabase.auth.admin.getUserById(userId);
-      
-      if (sbUser) {
-        app.log.info(`Syncing new OAuth user: ${sbUser.email}`);
-        // Auto-create user record
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert({
-            id: sbUser.id,
-            email: sbUser.email,
-            name: sbUser.user_metadata?.full_name || sbUser.email.split('@')[0],
-            tier: 'free'
-          })
-          .select()
-          .single();
-        
-        if (createError) {
-          app.log.error(`Failed to create synced user: ${createError.message}`);
-          return reply.status(500).send({ error: 'Database error during user sync' });
-        }
-        
-        user = newUser;
-
-        // Buat soul default
-        await supabase.from('souls').insert({
-          user_id: user.id,
-          name: 'Aria',
-          personality: 'warm, direct, intelligent',
-          speaking_style: 'conversational bahasa Indonesia',
-          is_setup: false
-        });
-      } else {
-        app.log.warn(`User ID ${req.user.id} not found in Supabase Auth or local table`);
-      }
-    }
-
-    if (!user) return reply.status(401).send({ error: 'User not found' });
-    
-    // Attach full user object to request
-    req.user = user;
-  } catch (err) {
-    app.log.error(`Auth decorator error: ${err.message}`);
-    reply.status(401).send({ error: 'Unauthorized' });
-  }
-});
 
 // ─── Routes ──────────────────────────────────────────
 // Root route (API info - move to /api for clarity)
@@ -219,12 +187,25 @@ app.get('/api', async () => ({
 // Favicon handler (to avoid 404)
 app.get('/favicon.ico', (req, reply) => reply.code(204).send());
 
-app.register(authRoutes,    { prefix: '/api/auth' });
-app.register(chatRoutes,    { prefix: '/api/chat' });
-app.register(soulRoutes,    { prefix: '/api/soul' });
-app.register(shopRoutes,    { prefix: '/api/shop' });
-app.register(webhookRoutes, { prefix: '/api/webhook' });
-app.register(botRoutes,     { prefix: '/api/bots' });
+// Initialize channels
+const whatsappChannel = new WhatsAppChannel(channelManager);
+const telegramChannel = new TelegramChannel(channelManager);
+const discordChannel = new DiscordChannel(channelManager);
+
+channelManager.registerChannel('whatsapp', whatsappChannel);
+channelManager.registerChannel('telegram', telegramChannel);
+channelManager.registerChannel('discord', discordChannel);
+
+// Make channels accessible to routes
+app.decorate('channels', channelManager.channels);
+
+app.register(authRoutes,     { prefix: '/api/auth' });
+app.register(chatRoutes,     { prefix: '/api/chat' });
+app.register(soulRoutes,     { prefix: '/api/soul' });
+app.register(shopRoutes,     { prefix: '/api/shop' });
+app.register(webhookRoutes,  { prefix: '/api/webhook' });
+app.register(botRoutes,      { prefix: '/api/bots' });
+app.register(channelsRoutes, { prefix: '/api/channels' });
 
 // Health check
 app.get('/health', async () => ({ status: 'ok', ts: Date.now() }));

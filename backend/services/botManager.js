@@ -24,15 +24,10 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto'
-import { createClient } from '@supabase/supabase-js'
 import { chat } from './ai.js'
+import { supabase } from '../config.js'
 import dotenv from 'dotenv'
 dotenv.config()
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
 
 // ─── Encryption untuk bot tokens ─────────────────────────
 const ENCRYPT_KEY = scryptSync(

@@ -1,4 +1,4 @@
-import { supabase } from '../server.js';
+import { supabase } from '../config.js';
 
 // Route ini dipanggil oleh bot saat user pertama kali chat
 // Auto-register tanpa perlu email/password

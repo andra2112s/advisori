@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { api } from './api'
-import { supabase } from './supabase'
 
 const AuthCtx = createContext()
 
@@ -9,54 +8,35 @@ export function AuthProvider({ children }) {
   const [soul, setSoul]       = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const syncUser = useCallback(() => {
+  const syncUser = useCallback(async () => {
     setLoading(true)
-    api.me()
-      .then(data => {
-        if (data && data.user) {
-          setUser(data.user)
-          setSoul(data.soul)
-        } else {
-          setUser(null)
-          setSoul(null)
-        }
-      })
-      .catch(() => {
-        localStorage.removeItem('advisori_token')
-        localStorage.removeItem('advisori_user')
-        setUser(null)
-        setSoul(null)
-      })
-      .finally(() => setLoading(false))
+    try {
+      const data = await api.get('/auth/me')
+      setUser(data.user)
+      setSoul(data.soul || null)
+    } catch (error) {
+      console.error('Failed to sync user:', error)
+      localStorage.removeItem('advisori_token')
+      localStorage.removeItem('advisori_user')
+      setUser(null)
+      setSoul(null)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    // 1. Check current session from Supabase (for OAuth)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        // Handle OAuth session
-        const { user: sbUser } = session
-        // Map Supabase user to our system
-        // Note: You might need a platform-login style endpoint to sync OAuth users
-        localStorage.setItem('advisori_token', session.access_token)
-        syncUser()
-      } else {
-        // 2. Check legacy token
-        const token = localStorage.getItem('advisori_token')
-        if (!token) { setLoading(false); return }
-        syncUser()
-      }
-    })
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        localStorage.setItem('advisori_token', session.access_token)
-        syncUser()
-      }
-    })
-
-    return () => subscription.unsubscribe()
+    console.log('🔐 Auth initialization...');
+    
+    const token = localStorage.getItem('advisori_token')
+    console.log('   Token:', token ? `EXISTS (${token.length} chars)` : 'NOT FOUND');
+    
+    if (!token) { 
+      console.log('❌ No token available');
+      setLoading(false); 
+      return 
+    }
+    syncUser()
   }, [syncUser])
 
   const login = async (email, password) => {
@@ -75,7 +55,7 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('advisori_token')
     localStorage.removeItem('advisori_user')
     setUser(null)
@@ -84,12 +64,15 @@ export function AuthProvider({ children }) {
   }
 
   const refreshSoul = async () => {
-    const data = await api.me()
-    if (data && data.soul) {
-      setSoul(data.soul)
-      return data.soul
+    try {
+      const data = await api.get('/soul')
+      setSoul(data)
+      return data
+    } catch (error) {
+      console.error('Failed to refresh soul:', error)
+      setSoul(null)
+      return null
     }
-    return null
   }
 
   return (

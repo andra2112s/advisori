@@ -158,6 +158,14 @@ export default function Chat() {
           {usage.used}/{usage.limit}
         </div>
 
+        <button onClick={() => window.location.href = '/channels'} style={{
+          fontSize: 12, fontWeight: 500, padding: '7px 14px',
+          border: '1px solid var(--border-md)', borderRadius: 'var(--radius)',
+          background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer',
+          transition: 'var(--trans)',
+        }}>
+          🦞 Channels
+        </button>
         <button onClick={() => setSidebar(!sidebarOpen)} style={{
           fontSize: 12, fontWeight: 500, padding: '7px 14px',
           border: '1px solid var(--border-md)', borderRadius: 'var(--radius)',

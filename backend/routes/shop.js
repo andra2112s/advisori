@@ -1,4 +1,4 @@
-import { supabase } from '../server.js';
+import { supabase } from '../config.js';
 
 export default async function shopRoutes(app) {
 

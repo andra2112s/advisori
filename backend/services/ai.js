@@ -1,18 +1,30 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { supabase } from '../server.js';
+import { supabase } from '../config.js';
 import { SkillRouter } from '../skills/router.js';
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const MODELS = {
-  simple:  'claude-haiku-4-5-20251001',
-  complex: 'claude-sonnet-4-20250514',
+  claude: {
+    simple: 'claude-haiku-4-5-20251001',
+    complex: 'claude-sonnet-4-20250514',
+  },
+  zai: {
+    simple: 'zai-gpt3.5',
+    complex: 'zai-gpt4',
+  }
 };
 
-function pickModel(message) {
+const PROVIDERS = {
+  claude: 'anthropic',
+  zai: 'z-ai'
+};
+
+function pickModel(message, provider = 'claude') {
   const m = message.toLowerCase();
   const simplePatterns = ['halo','hai','hi','apa kabar','terima kasih','ok','oke','makasih','thanks','siap','bisa'];
-  return (simplePatterns.some(p => m.includes(p)) && m.length < 60) ? MODELS.simple : MODELS.complex;
+  const isSimple = simplePatterns.some(p => m.includes(p)) && m.length < 60;
+  return isSimple ? MODELS[provider].simple : MODELS[provider].complex;
 }
 
 // Deteksi apakah pesan butuh real-time browsing
@@ -28,11 +40,82 @@ function needsBrowsing(message) {
   return browseKeywords.some(k => m.includes(k));
 }
 
-// Web search tool — built-in Anthropic, tidak perlu API tambahan
-const WEB_SEARCH_TOOL = {
-  type: 'web_search_20250305',
-  name: 'web_search',
-};
+// Z.ai API integration
+async function chatWithZAI(message, context, systemPrompt, history, useSearch = false) {
+  const zaiApiKey = process.env.ZAI_API_KEY;
+  if (!zaiApiKey) {
+    throw new Error('ZAI_API_KEY not configured');
+  }
+
+  // Prepare messages for Z.ai format
+  const messages = [];
+
+  // Add system prompt
+  if (systemPrompt) {
+    messages.push({
+      role: 'system',
+      content: systemPrompt
+    });
+  }
+
+  // Add conversation history
+  if (history && history.length > 0) {
+    history.forEach(msg => {
+      messages.push({
+        role: msg.role,
+        content: msg.content
+      });
+    });
+  }
+
+  // Add current message
+  messages.push({
+    role: 'user',
+    content: message
+  });
+
+  // Prepare request body
+  const requestBody = {
+    model: pickModel(message, 'zai'),
+    messages,
+    max_tokens: 2048,
+    temperature: 0.7,
+  };
+
+  // Add search capability if needed (Z.ai might have different API for this)
+  if (useSearch) {
+    // Note: Z.ai might have different search implementation
+    requestBody.tools = [{
+      type: 'web_search',
+      name: 'web_search'
+    }];
+  }
+
+  const response = await fetch('https://api.z.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${zaiApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(`Z.ai API error: ${error.error || response.statusText}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    content: data.choices[0]?.message?.content || 'No response from Z.ai',
+    usage: {
+      input_tokens: data.usage?.prompt_tokens || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
+      total_tokens: data.usage?.total_tokens || 0
+    }
+  };
+}
 
 async function loadUserContext(userId) {
   const { data: user } = await supabase
@@ -86,33 +169,80 @@ export async function chat({ userId, message, advisorId = 'auto', stream = false
   );
 
   const history = await loadHistory(userId, activeSkill.id);
-  const model = pickModel(message);
   const useSearch = needsBrowsing(message);
+
+  // Determine AI provider (default to Claude, can be overridden by user preference)
+  const aiProvider = ctx.soul?.ai_provider || 'claude';
 
   await saveMessage(userId, activeSkill.id, 'user', message);
 
+  let result;
+  if (aiProvider === 'zai') {
+    try {
+      // Try Z.ai first
+      result = await chatWithZAI(message, ctx, systemPrompt, history, useSearch);
+    } catch (zaiError) {
+      console.log('Z.ai failed, falling back to Claude:', zaiError.message);
+      // Fallback to Claude
+      result = await chatWithClaude(message, ctx, systemPrompt, history, useSearch);
+    }
+  } else {
+    // Use Claude
+    result = await chatWithClaude(message, ctx, systemPrompt, history, useSearch);
+  }
+
+  return {
+    content: result.content,
+    activeSkill,
+    usage: result.usage
+  };
+}
+
+// Web search tool — built-in Anthropic, tidak perlu API tambahan
+const WEB_SEARCH_TOOL = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+};
+
+async function chatWithClaude(message, context, systemPrompt, history, useSearch, stream = false) {
+  const model = pickModel(message, 'claude');
   const finalSystem = useSearch
     ? systemPrompt + '\n\nKamu bisa browsing internet real-time via web_search tool. Gunakan untuk data terkini: harga saham, kurs, berita, regulasi terbaru. Sebutkan sumber setelah mendapat hasil.'
     : systemPrompt;
 
-  const requestBody = {
-    model,
-    max_tokens: 2048,
-    system: finalSystem,
-    messages: [...history, { role: 'user', content: message }],
-    ...(useSearch && { tools: [WEB_SEARCH_TOOL] }),
-  };
-
   if (stream) {
-    const streamResp = await claude.messages.stream(requestBody);
-    return { stream: streamResp, activeSkill, usedSearch: useSearch };
+    const streamResult = await claude.messages.create({
+      model,
+      max_tokens: 2048,
+      system: finalSystem,
+      messages: history.map(h => ({ role: h.role, content: h.content })).concat([
+        { role: 'user', content: message }
+      ]),
+      tools: useSearch ? [WEB_SEARCH_TOOL] : undefined,
+      stream: true,
+    });
+
+    return { stream: streamResult };
+  } else {
+    const response = await claude.messages.create({
+      model,
+      max_tokens: 2048,
+      system: finalSystem,
+      messages: history.map(h => ({ role: h.role, content: h.content })).concat([
+        { role: 'user', content: message }
+      ]),
+      tools: useSearch ? [WEB_SEARCH_TOOL] : undefined,
+    });
+
+    return {
+      content: response.content[0]?.text || 'No response from Claude',
+      usage: {
+        input_tokens: response.usage?.input_tokens || 0,
+        output_tokens: response.usage?.output_tokens || 0,
+        total_tokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0)
+      }
+    };
   }
-
-  const response = await claude.messages.create(requestBody);
-  const content = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
-
-  await saveMessage(userId, activeSkill.id, 'assistant', content);
-  return { content, activeSkill, model, usedSearch: useSearch, usage: response.usage };
 }
 
 export async function updateMemory(userId, newFacts) {

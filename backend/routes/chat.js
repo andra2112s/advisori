@@ -1,9 +1,18 @@
 import { chat } from '../services/ai.js';
-import { supabase } from '../server.js';
+import { supabase } from '../config.js';
+import { HeartbeatService } from '../services/heartbeatService.js';
 
 export default async function chatRoutes(app) {
 
   // ── Streaming chat (web) ─────────────────────────────
+  app.options('/stream', async (req, reply) => {
+    reply.header('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:3000');
+    reply.header('Access-Control-Allow-Credentials', 'true');
+    reply.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Cache-Control');
+    reply.code(200).send();
+  });
+
   app.post('/stream', {
     preHandler: [app.authenticate],
   }, async (req, reply) => {
@@ -11,6 +20,11 @@ export default async function chatRoutes(app) {
     if (!message?.trim()) {
       return reply.status(400).send({ error: 'Message kosong' });
     }
+
+    // Manual CORS headers for streaming
+    reply.raw.setHeader('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:3000');
+    reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+    reply.raw.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Cache-Control');
 
     // SSE headers
     reply.raw.setHeader('Content-Type', 'text/event-stream');
@@ -50,6 +64,16 @@ export default async function chatRoutes(app) {
         content: fullContent,
         created_at: new Date().toISOString(),
       });
+
+      // Check if user should receive heartbeat (after chat)
+      // This is a good time since user is actively engaged
+      setTimeout(async () => {
+        try {
+          await HeartbeatService.sendHeartbeat(req.user.id, 'web');
+        } catch (err) {
+          console.log('Heartbeat check failed:', err.message);
+        }
+      }, 5000); // Check 5 seconds after chat
 
       reply.raw.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       reply.raw.end();

@@ -1,4 +1,4 @@
-const BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:4001/api'
+const BASE = '/api'
 
 function getToken() {
   return localStorage.getItem('advisori_token')
@@ -6,17 +6,27 @@ function getToken() {
 
 async function req(path, options = {}) {
   const token = getToken()
+  
+  console.log('🔑 API Request:', { path, hasToken: !!token, tokenLength: token?.length });
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  }
+  
+  // Add Authorization header only if token exists
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  
   const res = await fetch(BASE + path, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
+    headers,
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   })
 
   if (res.status === 401) {
+    console.error('❌ 401 Unauthorized response');
     localStorage.removeItem('advisori_token')
     localStorage.removeItem('advisori_user')
     // Jangan redirect otomatis di sini untuk menghindari loop
@@ -49,7 +59,6 @@ export const api = {
   // Auth
   register: (data)  => req('/auth/register', { method: 'POST', body: data }),
   login:    (data)  => req('/auth/login',    { method: 'POST', body: data }),
-  me:       ()      => req('/auth/me'),
 
   // Soul
   getSoul:    ()     => req('/soul'),
@@ -72,6 +81,18 @@ export const api = {
   disconnectWhatsApp:  ()           => req('/bots/whatsapp/disconnect', { method: 'POST' }),
   getWhatsAppQR:       ()           => req('/bots/whatsapp/qr'),
   updateBotBranding:   (pl, data)   => req(`/bots/${pl}/branding`,     { method: 'PATCH', body: data }),
+
+  // Channels — multi-channel messaging
+  getChannelConnections:    ()           => req('/channels/connections'),
+  generateWhatsAppQR:       ()           => req('/channels/whatsapp/qr', { method: 'POST' }),
+  connectWhatsAppChannel:   ()           => req('/channels/whatsapp/connect', { method: 'POST' }),
+  disconnectWhatsAppChannel: ()          => req('/channels/whatsapp/disconnect', { method: 'POST' }),
+  connectTelegramChannel:   (botToken)   => req('/channels/telegram/connect', { method: 'POST', body: { botToken } }),
+  disconnectTelegramChannel: ()          => req('/channels/telegram/disconnect', { method: 'POST' }),
+  connectDiscordChannel:    (botToken)   => req('/channels/discord/connect', { method: 'POST', body: { botToken } }),
+  disconnectDiscordChannel: ()           => req('/channels/discord/disconnect', { method: 'POST' }),
+  getChannelSessions:       (channel)    => req(`/channels/sessions${channel ? `?channel=${channel}` : ''}`),
+  getSessionMessages:       (sessionId)  => req(`/channels/sessions/${sessionId}/messages`),
 
   // Streaming chat — returns ReadableStream
   streamChat: async (message, advisorId) => {

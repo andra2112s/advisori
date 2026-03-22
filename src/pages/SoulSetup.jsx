@@ -69,7 +69,7 @@ export default function SoulSetup() {
       
       // Check if soul is properly set up
       if (refreshedSoul?.is_setup) {
-        navigate('/chat')
+        navigate('/channels')
       } else {
         console.error('Soul not marked as setup:', refreshedSoul)
         alert('Terjadi kesalahan. Silakan coba lagi.')

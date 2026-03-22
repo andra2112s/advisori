@@ -19,16 +19,12 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
+import { supabase } from '../config.js'
 import dotenv from 'dotenv'
 dotenv.config()
 
 const claude   = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
 
 // ─── Persona definitions ──────────────────────────────────
 const PERSONAS = [

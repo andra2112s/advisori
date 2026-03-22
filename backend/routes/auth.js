@@ -1,4 +1,4 @@
-import { supabase } from '../server.js';
+import { supabase } from '../config.js';
 import bcrypt from 'bcryptjs';
 
 export default async function authRoutes(app) {
@@ -111,26 +111,13 @@ export default async function authRoutes(app) {
     });
   });
 
-  // ── Get current user ────────────────────────────────
+  // ── Me ──────────────────────────────────────────────
   app.get('/me', {
     preHandler: [app.authenticate],
   }, async (req, reply) => {
-    const { data: user } = await supabase
-      .from('users')
-      .select('*, souls(*)')
-      .eq('id', req.user.id)
-      .single();
-
-    const soul = user.souls?.[0];
-
     reply.send({
-      user: { id: user.id, name: user.name, email: user.email, tier: user.tier },
-      soul: soul ? {
-        name: soul.name,
-        personality: soul.personality,
-        avatar: soul.avatar,
-        is_setup: soul.is_setup,
-      } : null,
+      user: req.user,
+      soul: null,
     });
   });
 

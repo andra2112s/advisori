@@ -1,4 +1,4 @@
-import { supabase } from '../server.js'
+import { supabase } from '../config.js'
 import {
   connectTelegram, disconnectTelegram,
   connectWhatsApp, disconnectWhatsApp,
