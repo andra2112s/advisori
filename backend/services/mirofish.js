@@ -1,74 +1,103 @@
 /**
  * Advisori × MiroFish-lite
- * ─────────────────────────────────────────────────────────
- * Implementasi ringan konsep MiroFish (swarm intelligence)
- * tanpa butuh Python backend atau Zep Cloud.
- *
- * Cara kerja:
- * 1. Spawn N "personas" analis dengan sudut pandang berbeda
- * 2. Setiap persona analisis query yang sama secara paralel
- * 3. Aggregator synthesize semua hasil → consensus
- * 4. Cache hasil di Supabase (expire 6 jam)
- *
- * Personas untuk saham IDX:
- * - Value Investor (Buffett style)
- * - Technical Analyst (chart-based)
- * - Macro Economist (top-down)
- * - Bearish Devil's Advocate (selalu skeptis)
- * - Retail Sentiment Tracker (FOMO/fear)
+ * Swarm intelligence for investment decisions
  */
 
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'crypto'
 import { supabase } from '../config.js'
-import dotenv from 'dotenv'
-dotenv.config()
 
 const claude   = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+// ─── MiroFish Tier Config ─────────────────────────────────
+export const MIROFISH_TIERS = {
+  free: { analysts: 0, enabled: false },
+  pro: { analysts: 3, enabled: true },
+  expert: { analysts: 5, enabled: true },
+  custom: { analysts: 7, enabled: true, webSearch: true },
+};
+
+// ─── Trigger patterns ────────────────────────────────────
+const TRIGGER_PATTERNS = [
+  'should i', 'should we', 'haruskah', 'sebaiknya',
+  'buy or not', 'beli atau tidak', 'jual atau tidak',
+  'rekomendasi', 'recomend', 'suggest',
+  'worth it', 'gak sih', ' worth it',
+  'bagus gak', 'apakah', 'aye recommended',
+  'analisis lengkap', 'deep dive',
+  'sekarang', 'harga', 'vs ',
+];
+
+export function shouldTriggerMiroFish(message, tier) {
+  const config = MIROFISH_TIERS[tier] || MIROFISH_TIERS.free;
+  if (!config.enabled) return false;
+  
+  const lower = message.toLowerCase();
+  return TRIGGER_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
+export function getMiroFishAnalysts(tier) {
+  const config = MIROFISH_TIERS[tier] || MIROFISH_TIERS.free;
+  return config.analysts;
+}
+
 // ─── Persona definitions ──────────────────────────────────
-const PERSONAS = [
+const PERSONA_TEMPLATES = [
   {
     id: 'value',
-    name: 'Viktor (Value Investor)',
+    name: 'Viktor (Value)',
     system: `Kamu adalah Viktor, analis value investing bergaya Buffett/Munger.
 Fokus: margin of safety, moat, ROE konsisten, cash flow, manajemen kualitas.
-Skeptis terhadap hype dan valuasi stretched. Horizon: 3-5 tahun.
-Jawab singkat dan konkrit dalam 3-4 kalimat. Akhiri dengan: VERDICT: [BUY/HOLD/AVOID] - [confidence 0-100]%`,
+Skeptis terhadap hype dan valuasi stretched.
+Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
   },
   {
     id: 'technical',
-    name: 'Tara (Technical Analyst)',
+    name: 'Tara (Teknikal)',
     system: `Kamu adalah Tara, analis teknikal berpengalaman.
 Fokus: trend, support/resistance, MA, RSI, MACD, volume, pola candlestick.
-Ignore fundamental, fokus price action dan momentum.
-Jawab singkat dalam 3-4 kalimat. Akhiri dengan: VERDICT: [BUY/HOLD/AVOID] - [confidence 0-100]%`,
+Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
   },
   {
     id: 'macro',
-    name: 'Marco (Macro Economist)',
-    system: `Kamu adalah Marco, ekonom makro dengan fokus Indonesia.
-Fokus: BI Rate, kurs USD/IDR, inflasi, komoditas, kebijakan fiskal, arus modal asing.
-Analisis top-down: global → Indonesia → sektor → emiten.
-Jawab singkat dalam 3-4 kalimat. Akhiri dengan: VERDICT: [BUY/HOLD/AVOID] - [confidence 0-100]%`,
+    name: 'Marco (Makro)',
+    system: `Kamu adalah Marco, ekonom makro fokus Indonesia.
+Fokus: BI Rate, kurs USD/IDR, inflasi, komoditas, kebijakan fiskal.
+Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
   },
   {
     id: 'bear',
-    name: 'Bruno (Devil\'s Advocate)',
-    system: `Kamu adalah Bruno, selalu mencari risiko dan worst-case scenario.
-Fokus: hutang tersembunyi, risiko regulasi, kompetitor, management red flags, valuation risk.
-Selalu skeptis dan pesimis — tugasmu mencari lubang dalam thesis bullish.
-Jawab singkat dalam 3-4 kalimat. Akhiri dengan: VERDICT: [BUY/HOLD/AVOID] - [confidence 0-100]%`,
+    name: 'Bruno (Bear)',
+    system: `Kamu adalah Bruno, selalu mencari risiko dan worst-case.
+Fokus: hutang tersembunyi, regulasi, kompetitor, red flags.
+Selalu skeptis. Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
   },
   {
     id: 'sentiment',
-    name: 'Sari (Sentiment Tracker)',
-    system: `Kamu adalah Sari, tracker sentimen retail dan institusional.
-Fokus: foreign flow, RRDI (retail), media coverage, social sentiment, insider transactions.
-Analisis apakah "smart money" sedang akumulasi atau distribusi.
-Jawab singkat dalam 3-4 kalimat. Akhiri dengan: VERDICT: [BUY/HOLD/AVOID] - [confidence 0-100]%`,
+    name: 'Sari (Sentimen)',
+    system: `Kamu adalah Sari, tracker sentimen retail & institusional.
+Fokus: foreign flow, media coverage, social sentiment, insider.
+Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
+  },
+  {
+    id: 'growth',
+    name: 'Gita (Growth)',
+    system: `Kamu adalah Gita, specialist growth investing.
+Fokus: revenue growth, TAM, competitive advantage, skalabilitas.
+Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
+  },
+  {
+    id: 'dividend',
+    name: 'Dini (Dividend)',
+    system: `Kamu adalah Dini, specialist dividend investing.
+Fokus: dividend yield, payout ratio, dividend growth history, cash flow.
+Jawab 3-4 kalimat. Akhiri: VERDICT: [BUY/HOLD/AVOID] - [confidence]%`,
   },
 ]
+
+function getPersonas(count) {
+  return PERSONA_TEMPLATES.slice(0, Math.min(count, PERSONA_TEMPLATES.length));
+}
 
 // ─── Parse verdict dari response ─────────────────────────
 function parseVerdict(text) {
@@ -111,10 +140,16 @@ function aggregateVerdicts(analyses) {
 }
 
 // ─── Main swarm prediction function ──────────────────────
-export async function swarmPredict({ query, userId, personaCount = 5 }) {
+export async function swarmPredict({ query, userId, personaCount = 5, tier = 'pro' }) {
+  const analysts = getMiroFishAnalysts(tier);
+  const actualCount = Math.min(personaCount, analysts);
+  
+  if (actualCount === 0) {
+    throw new Error('MiroFish not available for your tier');
+  }
 
   // Check cache
-  const queryHash = createHash('md5').update(query + userId).toISOString()
+  const queryHash = createHash('md5').update(query + userId).digest('hex')
   const { data: cached } = await supabase
     .from('swarm_predictions')
     .select('*')
@@ -130,8 +165,8 @@ export async function swarmPredict({ query, userId, personaCount = 5 }) {
     }
   }
 
-  // Pilih personas (batasi jumlah)
-  const selectedPersonas = PERSONAS.slice(0, Math.min(personaCount, PERSONAS.length))
+  // Pilih personas based on tier
+  const selectedPersonas = getPersonas(actualCount)
 
   // Run semua personas secara paralel
   console.log(`[MiroFish] Running ${selectedPersonas.length} personas for: "${query}"`)

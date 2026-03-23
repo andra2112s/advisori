@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '../config.js';
 import { SkillRouter } from '../skills/router.js';
+import { saveMemory, loadMemories } from './memoryExtractor.js';
+import { getStockPrice, formatStockData } from '../skills/advisori-saham/tools.js';
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -38,6 +40,35 @@ function needsBrowsing(message) {
     'berapa harga','kurs','dolar','bitcoin','crypto',
   ];
   return browseKeywords.some(k => m.includes(k));
+}
+
+// Detect stock tickers in message
+function extractStockTickers(message) {
+  // Common Indonesian stock tickers (4 letter uppercase)
+  const commonTickers = ['BBCA', 'BBRI', 'TLKM', 'BMRI', 'BBNI', 'UNVR', 'HMSN', 'BREN', 'GOTO', 'AMMN', 'TPIA', 'ICBP', 'INDF', 'KLBF', 'MENT', 'ASII', 'UNTR', 'PTBA', 'ANTM', 'ITMG', 'PGAS', 'PTUN', 'MEDC', 'ADRO', 'INDY', 'HRUM', 'MITI', 'TOWR', 'EXCL', 'FREN', 'ISAT', 'MATA'];
+  
+  const upperMsg = message.toUpperCase();
+  const found = [];
+  
+  // Check for common tickers
+  for (const ticker of commonTickers) {
+    if (upperMsg.includes(ticker)) {
+      found.push(ticker);
+    }
+  }
+  
+  // Also detect .JK pattern
+  const jkMatches = message.match(/([A-Z]{4})\.JK/gi);
+  if (jkMatches) {
+    for (const match of jkMatches) {
+      const ticker = match.replace('.JK', '').toUpperCase();
+      if (!found.includes(ticker)) {
+        found.push(ticker);
+      }
+    }
+  }
+  
+  return found;
 }
 
 // Z.ai API integration
@@ -170,13 +201,46 @@ export async function chat({ userId, message, advisorId = 'auto', stream = false
   const ctx = await loadUserContext(userId);
   await checkRateLimit(userId, ctx.tier);
 
+  // Load memories for Pro+ tiers only
+  let memories = [];
+  if (['pro', 'expert', 'custom', 'premium'].includes(ctx.tier)) {
+    try {
+      memories = await loadMemories(userId, message, 5);
+    } catch (err) {
+      console.log('[Memory] Load failed:', err.message);
+    }
+  }
+
   const { systemPrompt, activeSkill } = SkillRouter.build(
     message, ctx.soul, ctx.activeSkills,
     advisorId === 'auto' ? null : advisorId
   );
 
+  // Inject memories into system prompt
+  const memoryContext = memories.length > 0
+    ? '\n\n--- MEMORY (from previous conversations) ---\n' +
+      memories.map(m => `• ${m.content}`).join('\n') +
+      '\n--- END MEMORY ---'
+    : '';
+
   const history = await loadHistory(userId, activeSkill.id);
   const useSearch = needsBrowsing(message);
+  
+  // Check for stock tickers and fetch real-time data
+  let stockDataContext = '';
+  const tickers = extractStockTickers(message);
+  if (tickers.length > 0 && activeSkill.id === 'advisori-saham') {
+    try {
+      const stockResults = await Promise.all(
+        tickers.slice(0, 3).map(ticker => getStockPrice(ticker))
+      );
+      stockDataContext = '\n\n--- REAL-TIME STOCK DATA ---\n' +
+        stockResults.map((data, i) => formatStockData(data)).join('\n\n') +
+        '\n--- END STOCK DATA ---';
+    } catch (err) {
+      console.log('[Stock] Failed to fetch:', err.message);
+    }
+  }
 
   // Determine AI provider (default to Claude, can be overridden by user preference)
   const aiProvider = ctx.soul?.ai_provider || 'zai';
@@ -184,22 +248,33 @@ export async function chat({ userId, message, advisorId = 'auto', stream = false
   await saveMessage(userId, activeSkill.id, 'user', message);
 
   let result;
+  let responseContent = '';
+
   if (aiProvider === 'zai') {
     try {
-      // Try Z.ai first
-      result = await chatWithZAI(message, ctx, systemPrompt, history, useSearch);
+      result = await chatWithZAI(message, ctx, systemPrompt + memoryContext + stockDataContext, history, useSearch);
+      responseContent = result.content;
     } catch (zaiError) {
       console.log('Z.ai failed, falling back to Claude:', zaiError.message);
-      // Fallback to Claude
-      result = await chatWithClaude(message, ctx, systemPrompt, history, useSearch);
+      result = await chatWithClaude(message, ctx, systemPrompt + memoryContext + stockDataContext, history, useSearch);
+      responseContent = result.content;
     }
   } else {
-    // Use Claude
-    result = await chatWithClaude(message, ctx, systemPrompt, history, useSearch);
+    result = await chatWithClaude(message, ctx, systemPrompt + memoryContext + stockDataContext, history, useSearch);
+    responseContent = result.content;
+  }
+
+  // Save memories asynchronously (Pro+ only)
+  if (['pro', 'expert', 'custom', 'premium'].includes(ctx.tier) && responseContent) {
+    setImmediate(() => {
+      saveMemory(userId, message, responseContent).catch(err => {
+        console.log('[Memory] Save failed:', err.message);
+      });
+    });
   }
 
   return {
-    content: result.content,
+    content: responseContent,
     activeSkill,
     usage: result.usage
   };

@@ -1,0 +1,16 @@
+{
+  "id": "advisori-pajak",
+  "name": "Konsultan Pajak",
+  "emoji": "🧾",
+  "category": "tax",
+  "tier": "free",
+  "description": "Konsultan pajak pribadi - PPh 21, PPN, SPT, perencanaan pajak legal",
+  "author": "system",
+  "version": "1.0.0",
+  "keywords": ["pajak","pph","ppn","spt","npwp","lapor","efaktur","e-faktur","bupot","ptkp","ter","biaya jabatan","coretax","e-filing","tax planning","pkp","withholding","pp23","umkm pajak","zakat","penghasilan kena pajak"],
+  "tools": [],
+  "config": {
+    "streaming": false,
+    "webSearch": false
+  }
+}

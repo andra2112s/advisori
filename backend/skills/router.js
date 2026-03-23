@@ -1,97 +1,51 @@
-// ─── Skill definitions ───────────────────────────────
+import { systemPrompt as pajakPrompt, keywords as pajakKeywords } from './advisori-pajak/prompt.js';
+import { systemPrompt as sahamPrompt, keywords as sahamKeywords } from './advisori-saham/prompt.js';
+import { systemPrompt as hukumPrompt, keywords as hukumKeywords } from './advisori-hukum/prompt.js';
+import { systemPrompt as pendidikanPrompt, keywords as pendidikanKeywords } from './advisori-pendidikan/prompt.js';
 
 const SKILLS = {
-
   'advisori-pajak': {
     id: 'advisori-pajak',
     name: 'Konsultan Pajak',
     emoji: '🧾',
+    category: 'tax',
     tier: 'free',
-    keywords: ['pajak','pph','ppn','spt','npwp','lapor','efaktur','e-faktur',
-      'bupot','ptkp','ter','biaya jabatan','coretax','e-filing','tax planning',
-      'pkp','withholding','pp23','umkm pajak','zakat','penghasilan kena pajak'],
-    prompt: () => `
-## Skill Aktif: Konsultan Pajak Indonesia 🧾
-
-Kamu adalah konsultan pajak pribadi. Ahli PPh 21, PPN, SPT, perencanaan pajak legal, administrasi Coretax DJP.
-
-### PTKP 2025
-TK/0: Rp54jt | K/0: Rp58.5jt | K/1: Rp63jt | K/2: Rp67.5jt | K/3: Rp72jt
-
-### Tarif PPh 21 Progresif
-≤60jt: 5% | 60-250jt: 15% | 250-500jt: 25% | 500jt-5M: 30% | >5M: 35%
-
-### Format Kalkulasi Wajib
-Saat hitung pajak selalu tampilkan:
-Gaji bruto → (-) Biaya jabatan → (-) PTKP → PKP → Progresif → PPh/bulan → Take home
-
-### Deadline
-SPT OP: 31 Maret | SPT Badan: 30 April | SPT Masa: tgl 20 bulan berikutnya
-
-### Aturan
-- Hitung langsung jika ada angka, jangan tanya-tanya
-- Transparansi perhitungan = kepercayaan
-- Keputusan > Rp50jt → rekomendasikan konsultan USKP`.trim(),
+    description: 'Konsultan pajak pribadi - PPh 21, PPN, SPT, perencanaan pajak legal',
+    prompt: () => pajakPrompt,
+    keywords: pajakKeywords,
   },
-
   'advisori-saham': {
     id: 'advisori-saham',
     name: 'Analis Saham IDX',
     emoji: '📈',
+    category: 'investing',
     tier: 'free',
-    keywords: ['saham','ihsg','idx','bursa','beli','jual','porto','portofolio',
-      'analisis','fundamental','teknikal','valuasi','per','pbv','eps','dividen',
-      'right issue','ipo','screening','watchlist','cut loss','take profit',
-      'averaging','support','resistance','bbca','bbri','tlkm','bren','goto',
-      'foreign flow','net buy','net sell','bi rate','inflasi','kurs'],
-    prompt: () => `
-## Skill Aktif: Analis Saham IDX 📈
-
-Kamu adalah analis saham IDX pribadi. Fundamental + teknikal + makro Indonesia.
-
-### Format Quick Look Wajib
-QUICK LOOK: [TICKER]
-PER: Xx | PBV: Xx | ROE: X% | DER: Xx | Div Yield: X%
-Teknikal: vs MA50 [✅/⚠️] | RSI(14): XX | Trend: [Up/Down/Sideways]
-Risiko: 1. [risiko] 2. [risiko]
-Verdict: [Strong Buy/Buy/Hold/Watch/Avoid] — [alasan 1 kalimat]
-
-### Sektor IDX
-Perbankan: NIM, NPL, CAR, CASA | Komoditas: CPO, batu bara, nikel
-EBT: kapasitas, PPA | Konsumer: same-store sales | Properti: presales
-
-### Aturan
-- Analisis langsung jika ada ticker, jangan tanya
-- Selalu sertakan risiko — dua sisi selalu ada
-- TIDAK pernah janji return atau "pasti naik"
-- ⚠️ Bukan rekomendasi investasi resmi. Keputusan ada di tangan investor.`.trim(),
+    description: 'Analis saham IDX - fundamental, teknikal, makro Indonesia',
+    prompt: () => sahamPrompt,
+    keywords: sahamKeywords,
   },
-
   'advisori-hukum': {
     id: 'advisori-hukum',
     name: 'Konsultan Hukum Bisnis',
     emoji: '⚖️',
+    category: 'legal',
     tier: 'pro',
-    keywords: ['pt','cv','kontrak','pkwt','pkwtt','haki','merek','perizinan',
-      'oss','nib','pendirian','badan usaha','hukum','legal','perjanjian',
-      'wanprestasi','gugatan','somasi','kuasa hukum'],
-    prompt: () => `
-## Skill Aktif: Konsultan Hukum Bisnis ⚖️
-
-Kamu adalah konsultan hukum bisnis Indonesia. Pendirian PT/CV, kontrak, HAKI, perizinan OSS.
-
-### Fokus
-Pendirian badan usaha, draft kontrak sederhana, perizinan NIB/OSS, HAKI merek/paten, ketenagakerjaan PKWT/PKWTT
-
-### Aturan
-- Jawab berdasarkan hukum Indonesia yang berlaku
-- Untuk keputusan hukum material → rekomendasikan advokat/notaris berlisensi
-- ⚠️ Bukan pengganti konsultasi hukum resmi.`.trim(),
+    description: 'Konsultan hukum bisnis - pendirian PT/CV, kontrak, HAKI, perizinan',
+    prompt: () => hukumPrompt,
+    keywords: hukumKeywords,
   },
-
+  'advisori-pendidikan': {
+    id: 'advisori-pendidikan',
+    name: 'Pendidikan & Karir',
+    emoji: '🎓',
+    category: 'career',
+    tier: 'free',
+    description: 'Konsultan pendidikan dan karir - S2, beasiswa, wirausaha, negosiasi gaji',
+    prompt: () => pendidikanPrompt,
+    keywords: pendidikanKeywords,
+  },
 };
 
-// General fallback
 const SKILL_GENERAL = {
   id: 'general',
   name: 'Asisten Umum',
@@ -105,7 +59,6 @@ Bantu user dengan pertanyaan umum. Jika menyentuh pajak, saham, atau hukum,
 ingatkan bahwa ada skill khusus untuk itu dan tawarkan untuk beralih.`.trim(),
 };
 
-// ─── Soul → system prompt ────────────────────────────
 function buildSoulPrompt(soul) {
   if (!soul) return `
 Kamu adalah Aria, asisten AI pribadi dari platform Advisori.
@@ -133,7 +86,6 @@ ${soul.quirks?.length ? `Quirks: ${soul.quirks.join(', ')}` : ''}
 - Untuk keputusan besar (keuangan, hukum) → selalu sertakan disclaimer`.trim();
 }
 
-// ─── Memory → context string ─────────────────────────
 function buildMemoryPrompt(soul) {
   const mem = soul?.memory;
   if (!mem) return '';
@@ -162,7 +114,6 @@ function buildMemoryPrompt(soul) {
   return parts.length > 0 ? parts.join('\n') : '';
 }
 
-// ─── Skill detector ──────────────────────────────────
 function detectSkill(message, activeSkills, forceSkillId = null) {
   if (forceSkillId && SKILLS[forceSkillId]) {
     return SKILLS[forceSkillId];
@@ -187,9 +138,7 @@ function detectSkill(message, activeSkills, forceSkillId = null) {
   return best.skill;
 }
 
-// ─── Main builder ─────────────────────────────────────
 export const SkillRouter = {
-
   build(message, soul, activeSkills = [], forceSkillId = null) {
     const skill = detectSkill(message, activeSkills, forceSkillId);
 
@@ -212,5 +161,9 @@ export const SkillRouter = {
 
   getFreeSkills() {
     return Object.values(SKILLS).filter(s => s.tier === 'free');
+  },
+
+  getProSkills() {
+    return Object.values(SKILLS).filter(s => s.tier === 'pro');
   },
 };

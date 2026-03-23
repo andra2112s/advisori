@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import SoulSetup from './pages/SoulSetup'
 import Chat from './pages/Chat'
 import Channels from './pages/Channels'
+import Notes from './pages/Notes'
 import { Spinner } from './components/ui'
 
 function PrivateRoute({ children }) {
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/soul-setup" element={<PrivateRoute><SoulSetup /></PrivateRoute>} />
             <Route path="/chat"       element={<SoulRoute><Chat /></SoulRoute>} />
             <Route path="/channels"   element={<SoulRoute><Channels /></SoulRoute>} />
+            <Route path="/notes"      element={<SoulRoute><Notes /></SoulRoute>} />
             <Route path="*"           element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

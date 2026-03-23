@@ -34,6 +34,216 @@ export default function Chat() {
   const [histLoaded, setHistLoaded] = useState(false)
   const messagesEnd = useRef(null)
   const inputRef    = useRef(null)
+  const fileInputRef = useRef(null)
+  const [pendingImage, setPendingImage] = useState(null)
+  const [imageContext, setImageContext] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [selectedSubCategory, setSelectedSubCategory] = useState(null)
+  const [mirofishResult, setMirofishResult] = useState(null)
+  const [mirofishLoading, setMirofishLoading] = useState(false)
+
+  const CATEGORIES = [
+    { 
+      id: 'investing', 
+      emoji: '📊', 
+      label: 'Investing & Saham',
+      subCategories: [
+        { id: 'stock-analysis', label: 'Analisis Saham', prompts: ['Analisis BBCA sekarang', 'Sektor apa yang menarik?', 'Rekomendasi saham untuk pemula'] },
+        { id: 'portfolio', label: 'Portofolio', prompts: ['Review portofolio saya', 'Diversifikasi yang tepat', 'Risk assessment'] },
+        { id: 'trading', label: 'Trading', prompts: ['Strategi trading harian', 'Swing trading vs hold', 'Cut loss strategy'] },
+      ]
+    },
+    { 
+      id: 'tax', 
+      emoji: '🧾', 
+      label: 'Pajak & Administrasi',
+      subCategories: [
+        { id: 'pph21', label: 'PPh 21', prompts: ['Hitung PPh 21', 'Potongan pajak kantor', 'PTKP terbaru'] },
+        { id: 'spt', label: 'SPT Tahunan', prompts: ['Cara lapor SPT online', 'Deadline SPT', 'Denda keterlambatan'] },
+        { id: 'npwp', label: 'NPWP & NIK', prompts: ['Nabung pakai NIK', 'NPWP wajib pajak', 'Linking NPWP'] },
+      ]
+    },
+    { 
+      id: 'business', 
+      emoji: '💼', 
+      label: 'Bisnis & UMKM',
+      subCategories: [
+        { id: 'legal', label: 'Bentuk Usaha', prompts: ['Beda PT dan CV', 'Cara daftar PT', 'Modal最小 untuk PT'] },
+        { id: 'financing', label: 'Pendanaan', prompts: ['Pinjam ke bank', 'Crowdfunding', 'VC untuk startup'] },
+        { id: 'nib', label: 'NIB & Izin', prompts: ['Cara dapat NIB', 'NIB untuk ekspor', 'Izin khusus usaha'] },
+      ]
+    },
+    { 
+      id: 'legal', 
+      emoji: '⚖️', 
+      label: 'Hukum & Kontrak',
+      subCategories: [
+        { id: 'contract', label: 'Kontrak', prompts: ['Draft kontrak kerja freelance', 'Klausul penting dalam MOU', 'Kontrak bisnis yang aman'] },
+        { id: 'dispute', label: 'Sengketa', prompts: ['Cara mediasi', 'Gugatan ke pengadilan', 'Arbitrase vs litigasi'] },
+        { id: 'ip', label: 'Hak Kekayaan Intelektual', prompts: ['Cara daftar merek', 'Copyright vs trademark', 'Royalti'] },
+      ]
+    },
+    { 
+      id: 'financial', 
+      emoji: '💰', 
+      label: 'Perencanaan Keuangan',
+      subCategories: [
+        { id: 'budgeting', label: 'Budgeting', prompts: ['Susun anggaran bulanan', '50/30/20 rule', 'Emergency fund'] },
+        { id: 'debt', label: 'Hutang & Cicilan', prompts: ['Konsolidasi utang', 'Strategi lunasi KPR', 'Credit card debt'] },
+        { id: 'insurance', label: 'Asuransi', prompts: ['Asuransi jiwa vs kesehatan', 'Unit link', 'Klaim asuransi'] },
+      ]
+    },
+    { 
+      id: 'career', 
+      emoji: '🎓', 
+      label: 'Karir & Pendidikan',
+      subCategories: [
+        { id: 'job', label: 'Karir', prompts: ['Negosiasi gaji', 'Resign dengan baik', 'Quiet quitting'] },
+        { id: 'edu', label: 'Pendidikan', prompts: ['S2 atau kerja dulu?', 'Beasiswa dalam negeri', 'Kursus online bermanfaat'] },
+        { id: 'entrepreneurship', label: 'Wirausaha', prompts: ['Mulai bisnis dari nol', 'Validasi ide bisnis', 'Pivot strategi'] },
+      ]
+    },
+    { 
+      id: 'life', 
+      emoji: '🧭', 
+      label: 'Keputusan Hidup',
+      subCategories: [
+        { id: 'major', label: 'Keputusan Besar', prompts: ['Beli rumah atau investasi?', 'Nikah atau fokus karir?', 'Pindah ke luar negeri'] },
+        { id: 'relationships', label: 'Relasi & Networking', prompts: ['Networking efektif', 'Maintain hubungan', 'Personal branding'] },
+      ]
+    },
+    { 
+      id: 'chat', 
+      emoji: '💬', 
+      label: 'Ngobrol Aja',
+      subCategories: [
+        { id: 'random', label: 'Bebas', prompts: ['Cerita hari ini', 'Opini tentang...', 'Hiburan'] },
+      ]
+    },
+    { 
+      id: 'notes', 
+      emoji: '📝', 
+      label: 'Catatan Saya',
+      subCategories: [
+        { id: 'view-notes', label: 'Lihat Catatan', prompts: ['Buka halaman notes'] },
+        { id: 'new-note', label: 'Buat Catatan Baru', prompts: ['Tolong buatkan catatan tentang...'] },
+      ]
+    },
+  ]
+
+  const handleCategorySelect = (category) => {
+    setSelectedCategory(category)
+    setSelectedSubCategory(null)
+  }
+
+  const handleSubCategorySelect = (subCategory) => {
+    setSelectedSubCategory(subCategory)
+    
+    // Special handling for Notes category
+    if (selectedCategory?.id === 'notes') {
+      if (subCategory.id === 'view-notes') {
+        window.location.href = '/notes'
+        return
+      }
+    }
+    
+    // Auto-send first prompt
+    if (subCategory.prompts?.[0]) {
+      setTimeout(() => {
+        setInput(subCategory.prompts[0])
+        inputRef.current?.focus()
+      }, 100)
+    }
+  }
+
+  const handlePromptClick = (prompt) => {
+    setInput(prompt)
+    inputRef.current?.focus()
+  }
+
+  const resetCategory = () => {
+    setSelectedCategory(null)
+    setSelectedSubCategory(null)
+  }
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const previewUrl = URL.createObjectURL(file)
+    setPendingImage({ file, previewUrl, fileName: file.name })
+    setImageContext('')
+    e.target.value = ''
+  }
+
+  const sendImageWithContext = async () => {
+    if (!pendingImage || loading) return
+    
+    const { file, previewUrl, fileName } = pendingImage
+    const msgId = Date.now()
+    const userMsg = { role: 'user', content: imageContext || `[Gambar: ${fileName}]`, image: previewUrl, id: msgId, uploading: true }
+    setMessages(prev => [...prev, userMsg])
+    setPendingImage(null)
+    setImageContext('')
+    setLoading(true)
+    
+    try {
+      // Convert to base64
+      const reader = new FileReader()
+      const base64 = await new Promise((resolve) => {
+        reader.onload = () => resolve(reader.result.split(',')[1])
+        reader.readAsDataURL(pendingImage.file)
+      })
+      
+      // Upload to server
+      const result = await api.uploadImage(base64)
+      
+      // Update message with uploaded URL
+      const updatedMsg = { ...userMsg, uploading: false, image: result.url }
+      setMessages(prev => prev.map(m => m.id === msgId ? updatedMsg : m))
+      
+      // Build prompt with image and user context
+      const prompt = imageContext 
+        ? `[Image: ${result.url}]\n\n${imageContext}` 
+        : `[Image: ${result.url}] ${fileName}`
+      
+      // Send to AI
+      const res = await api.streamChat(prompt, activeAdvisor)
+      
+      if (!res.ok) throw new Error('Failed to get response')
+      
+      const streamReader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let aiMsg = ''
+      const aiMsgId = Date.now()
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: '', id: aiMsgId }])
+      
+      while (true) {
+        const { done, value } = await streamReader.read()
+        if (done) break
+        const text = decoder.decode(value)
+        const lines = text.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.type === 'token') {
+                aiMsg += data.text
+                setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: aiMsg } : m))
+              }
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Image upload error:', err)
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: 'Gagal upload gambar', role: 'error', uploading: false } : m))
+    } finally {
+      setLoading(false)
+      e.target.value = ''
+    }
+  }
 
   const soulName   = soul?.name   || 'Aria'
   const soulAvatar = soul?.avatar || '✦'
@@ -72,14 +282,14 @@ export default function Chat() {
         return
       }
 
-      const reader  = res.body.getReader()
+      const streamReader  = res.body.getReader()
       const decoder = new TextDecoder()
       let botId     = Date.now() + 1
       let fullText  = ''
       let botAdded  = false
 
       while (true) {
-        const { done, value } = await reader.read()
+        const { done, value } = await streamReader.read()
         if (done) break
 
         const lines = decoder.decode(value).split('\n')
@@ -126,64 +336,82 @@ export default function Chat() {
   const activeAdvisorObj = ADVISORS.find(a => a.id === activeAdvisor) || ADVISORS[0]
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* Header */}
+      {/* Header - Matching Landing Page */}
       <header style={{
-        height: 60, background: 'var(--surface)', borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', padding: '0 20px', gap: 14, flexShrink: 0,
+        height: 64, background: '#fff', borderBottom: '1px solid #eee',
+        display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16, flexShrink: 0,
         position: 'relative', zIndex: 10,
       }}>
-        <Avatar avatar={soulAvatar} size={38} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 400 }}>
-            {soulName}
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => window.location.href = '/'}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #FF6B35 0%, #FF8F5C 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 20 }}>🦞</span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <StatusDot online /> Online
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>
+            Advisori<span style={{ color: '#FF6B35' }}>.</span>
+          </span>
+        </div>
+
+        {/* Nav Links */}
+        <div style={{ display: 'flex', gap: 8, marginLeft: 24 }}>
+          {[
+            { label: 'Chat', href: '/chat', icon: '💬' },
+            { label: 'Notes', href: '/notes', icon: '📝' },
+            { label: 'Channels', href: '/channels', icon: '📱' },
+          ].map(link => (
+            <a key={link.href} href={link.href} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 8,
+              fontSize: 14, fontWeight: 500,
+              color: window.location.pathname === link.href ? '#FF6B35' : '#666',
+              background: window.location.pathname === link.href ? '#FFF3F0' : 'transparent',
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+            }}>
+              <span>{link.icon}</span>
+              {link.label}
+            </a>
+          ))}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* User Info */}
+        <Avatar avatar={soulAvatar} size={36} style={{ marginRight: 4 }} />
+        <div style={{ marginRight: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#1a1a1a' }}>{soulName}</div>
+          <div style={{ fontSize: 11, color: '#4CAF50', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, background: '#4CAF50', borderRadius: '50%', display: 'inline-block' }} />
+            Online
             {skillBadge && (
-              <span style={{
-                marginLeft: 8, background: 'var(--gold-dim)', color: 'var(--gold-text)',
-                border: '1px solid var(--gold)', borderRadius: 99, padding: '1px 8px',
-                fontSize: 11, fontWeight: 500,
-              }}>
-                {skillBadge}
-              </span>
+              <span style={{ marginLeft: 8, color: '#FF6B35' }}>{skillBadge}</span>
             )}
           </div>
         </div>
 
-        {/* Usage bar */}
-        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginRight: 8 }}>
-          {usage.used}/{usage.limit}
+        {/* Usage */}
+        <div style={{ 
+          padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+          background: '#f5f5f5', color: '#666', marginRight: 12,
+        }}>
+          {usage.used}/{usage.limit} msg
         </div>
 
-        <button onClick={() => window.location.href = '/channels'} style={{
-          fontSize: 12, fontWeight: 500, padding: '7px 14px',
-          border: '1px solid var(--border-md)', borderRadius: 'var(--radius)',
-          background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer',
-          transition: 'var(--trans)',
-        }}>
-          🦞 Channels
-        </button>
-        <button onClick={() => setSidebar(!sidebarOpen)} style={{
-          fontSize: 12, fontWeight: 500, padding: '7px 14px',
-          border: '1px solid var(--border-md)', borderRadius: 'var(--radius)',
-          background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer',
-          transition: 'var(--trans)',
-        }}>
-          Advisors
-        </button>
-        <ThemeToggle />
         <button onClick={logout} style={{
-          fontSize: 12, padding: '7px 12px', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)', background: 'transparent',
-          color: 'var(--ink-3)', cursor: 'pointer',
-        }}>Keluar</button>
+          padding: '8px 14px', border: '1px solid #ddd', borderRadius: 8,
+          background: 'transparent', color: '#666', cursor: 'pointer', fontSize: 13,
+        }}>
+          Logout
+        </button>
       </header>
 
       {/* Usage progress */}
-      <div style={{ height: 2, background: 'var(--bg-3)', flexShrink: 0 }}>
+      <div style={{ height: 2, background: '#f0f0f0', flexShrink: 0 }}>
         <div style={{
           height: '100%', background: usagePct > 80 ? 'var(--danger)' : 'var(--gold)',
           width: usagePct + '%', transition: 'width 0.5s ease',
@@ -202,15 +430,112 @@ export default function Chat() {
                 Halo, saya {soulName}
               </div>
               <p style={{ fontSize: 14, color: 'var(--ink-3)', marginBottom: 24, fontWeight: 300 }}>
-                {soul?.personality?.split(',')[0] || 'Siap menemanimu'} — tanyakan apapun.
+                {soul?.personality?.split(',')[0] || 'Siap menemanimu'} — pilih topik atau tanya langsung.
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-                {activeAdvisorObj.prompts.map(p => (
-                  <Chip key={p} onClick={() => { setInput(p); inputRef.current?.focus() }}>
-                    {p}
-                  </Chip>
-                ))}
-              </div>
+
+              {!selectedCategory ? (
+                <>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                    gap: 10, 
+                    marginBottom: 20,
+                    textAlign: 'left',
+                  }}>
+                    {CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleCategorySelect(cat)}
+                        style={{
+                          padding: '14px 12px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-lg)',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'var(--trans)',
+                        }}
+                        onMouseOver={(e) => e.target.style.borderColor = 'var(--gold)'}
+                        onMouseOut={(e) => e.target.style.borderColor = 'var(--border)'}
+                      >
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>{cat.emoji}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{cat.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                    {activeAdvisorObj.prompts.map(p => (
+                      <Chip key={p} onClick={() => handlePromptClick(p)}>
+                        {p}
+                      </Chip>
+                    ))}
+                  </div>
+                </>
+              ) : !selectedSubCategory ? (
+                <>
+                  <button
+                    onClick={resetCategory}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', background: 'transparent',
+                      border: '1px solid var(--border)', borderRadius: 99,
+                      fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer', marginBottom: 20,
+                    }}
+                  >
+                    ← Kembali
+                  </button>
+                  <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 16 }}>
+                    {selectedCategory.emoji} {selectedCategory.label}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 400, margin: '0 auto' }}>
+                    {selectedCategory.subCategories.map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => handleSubCategorySelect(sub)}
+                        style={{
+                          padding: '12px 16px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          fontSize: 14,
+                          color: 'var(--ink)',
+                          transition: 'var(--trans)',
+                        }}
+                        onMouseOver={(e) => { e.target.style.borderColor = 'var(--gold)'; e.target.style.background = 'var(--bg-2)'; }}
+                        onMouseOut={(e) => { e.target.style.borderColor = 'var(--border)'; e.target.style.background = 'var(--surface)'; }}
+                      >
+                        {sub.label} →
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setSelectedSubCategory(null)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', background: 'transparent',
+                      border: '1px solid var(--border)', borderRadius: 99,
+                      fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer', marginBottom: 20,
+                    }}
+                  >
+                    ← {selectedCategory.label}
+                  </button>
+                  <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 16 }}>
+                    {selectedSubCategory.label}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                    {selectedSubCategory.prompts.map(p => (
+                      <Chip key={p} onClick={() => handlePromptClick(p)}>
+                        {p}
+                      </Chip>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -250,8 +575,14 @@ export default function Chat() {
                     {msg.content}
                   </div>
                 ) : (
-                  <div
-                    style={{
+                  <>
+                    {msg.image && (
+                      <div style={{ marginBottom: 8 }}>
+                        <img src={msg.image} alt={msg.content} style={{ maxWidth: 200, borderRadius: 8, border: '1px solid var(--border)' }} />
+                      </div>
+                    )}
+                    <div
+                      style={{
                       background: msg.role === 'user' ? 'var(--ink)' : 'var(--surface)',
                       border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-lg)',
@@ -263,6 +594,7 @@ export default function Chat() {
                     }}
                     dangerouslySetInnerHTML={{ __html: formatText(msg.content) + (loading && msg.id === messages[messages.length-1]?.id && msg.role === 'assistant' ? '<span style="animation:blink 1s step-end infinite">▊</span>' : '') }}
                   />
+                  </>
                 )}
               </div>
             </div>
@@ -292,6 +624,83 @@ export default function Chat() {
             </div>
           )}
 
+          {/* MiroFish Panel */}
+          {mirofishResult && (
+            <div style={{
+              marginTop: 20,
+              padding: 20,
+              background: 'var(--surface)',
+              border: '2px solid var(--gold)',
+              borderRadius: 'var(--radius-lg)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 24 }}>🐠</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 18 }}>MiroFish Analysis</span>
+                  {mirofishResult.fromCache && (
+                    <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>(cached)</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setMirofishResult(null)}
+                  style={{
+                    padding: '4px 10px', background: 'transparent',
+                    border: '1px solid var(--border)', borderRadius: 99,
+                    fontSize: 12, cursor: 'pointer',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                {mirofishResult.personas?.map((p, i) => (
+                  <div key={i} style={{
+                    padding: '6px 12px',
+                    background: 'var(--bg-2)',
+                    borderRadius: 99,
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: p.verdict?.signal === 'BUY' ? '#4CAF50' : p.verdict?.signal === 'AVOID' ? '#f44336' : '#FFC107'
+                    }} />
+                    {p.persona?.split('(')[0]?.trim()}: {p.verdict?.signal} ({p.verdict?.confidence}%)
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                padding: 12,
+                background: 'var(--bg-2)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: 12,
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4 }}>
+                  Consensus: 
+                  <span style={{
+                    marginLeft: 8,
+                    fontWeight: 600,
+                    color: mirofishResult.consensus?.signal === 'BUY' ? '#4CAF50' : mirofishResult.consensus?.signal === 'AVOID' ? '#f44336' : '#FFC107'
+                  }}>
+                    {mirofishResult.consensus?.signal}
+                  </span>
+                  <span style={{ marginLeft: 8 }}>
+                    {mirofishResult.consensus?.confidence}% confidence
+                  </span>
+                </div>
+                <div dangerouslySetInnerHTML={{ __html: formatText(mirofishResult.synthesis || '') }} />
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', fontStyle: 'italic' }}>
+                ⚠️ Bukan rekomendasi investasi. Keputusan ada di tangan investor.
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEnd} />
         </div>
       </div>
@@ -302,46 +711,106 @@ export default function Chat() {
         padding: '14px 20px', flexShrink: 0,
       }}>
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-            placeholder={`Tanya ${soulName}...`}
-            rows={1}
-            style={{
-              flex: 1, background: 'var(--bg-2)', border: '1px solid var(--border-md)',
-              borderRadius: 'var(--radius-md)', padding: '11px 16px',
-              fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink)',
-              resize: 'none', outline: 'none', fontWeight: 300, lineHeight: 1.5,
-              minHeight: 46, maxHeight: 120, overflowY: 'auto',
-              transition: 'border-color .2s',
-            }}
-            onInput={e => {
-              e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-            }}
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            style={{ display: 'none' }}
           />
-          <button
-            onClick={sendMsg}
-            disabled={!input.trim() || loading}
-            style={{
-              width: 46, height: 46, background: 'var(--ink)', border: 'none',
-              borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: (!input.trim() || loading) ? 0.4 : 1,
-              transition: 'var(--trans)',
-            }}
-          >
-            {loading
-              ? <Spinner size={16} color="var(--bg)" />
-              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            }
-          </button>
+          {pendingImage ? (
+            <div style={{ flex: 1, display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <img 
+                  src={pendingImage.previewUrl} 
+                  alt="Preview" 
+                  style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} 
+                />
+                <button
+                  onClick={() => setPendingImage(null)}
+                  style={{
+                    position: 'absolute', top: -8, right: -8, width: 20, height: 20,
+                    borderRadius: '50%', border: 'none', background: 'var(--danger)',
+                    color: 'white', fontSize: 12, cursor: 'pointer', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <textarea
+                value={imageContext}
+                onChange={e => setImageContext(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendImageWithContext() } }}
+                placeholder={`Apa yang ingin ditanyakan tentang gambar ini?`}
+                rows={1}
+                style={{
+                  flex: 1, background: 'var(--bg-2)', border: '1px solid var(--gold)',
+                  borderRadius: 'var(--radius-md)', padding: '11px 16px',
+                  fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink)',
+                  resize: 'none', outline: 'none', fontWeight: 300, lineHeight: 1.5,
+                  minHeight: 46, maxHeight: 120, overflowY: 'auto',
+                }}
+                onInput={e => {
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                }}
+              />
+              <button
+                onClick={sendImageWithContext}
+                disabled={loading}
+                style={{
+                  width: 46, height: 46, background: 'var(--gold)', border: 'none',
+                  borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: loading ? 0.4 : 1,
+                }}
+                title="Kirim"
+              >
+                {loading
+                  ? <Spinner size={16} color="var(--bg)" />
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                }
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: 46, height: 46, background: 'var(--bg-2)', border: '1px solid var(--border-md)',
+                  borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'var(--trans)',
+                }}
+                title="Kirim gambar"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </button>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
+                placeholder={`Tanya ${soulName}...`}
+                rows={1}
+                style={{
+                  flex: 1, background: 'var(--bg-2)', border: '1px solid var(--border-md)',
+                  borderRadius: 'var(--radius-md)', padding: '11px 16px',
+                  fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink)',
+                  resize: 'none', outline: 'none', fontWeight: 300, lineHeight: 1.5,
+                  minHeight: 46, maxHeight: 120, overflowY: 'auto',
+                  transition: 'border-color .2s',
+                }}
+                onInput={e => {
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                }}
+              />
+            </>
+          )}
         </div>
       </div>
-
-      {/* Sidebar */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebar(false)}

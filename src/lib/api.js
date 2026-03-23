@@ -106,4 +106,26 @@ export const api = {
       body: JSON.stringify({ message, advisorId }),
     })
   },
+
+  // Upload image
+  uploadImage: async (base64Image) => {
+    return req('/chat/upload-image', { 
+      method: 'POST', 
+      body: { image: base64Image }
+    })
+  },
+
+  // MiroFish
+  runMiroFish: (query) => req('/chat/mirofish', { method: 'POST', body: { query } }),
+
+  // Notes
+  getNotes: () => req('/notes'),
+  getNote: (id) => req(`/notes/${id}`),
+  createNote: (data) => req('/notes', { method: 'POST', body: data }),
+  updateNote: (id, data) => req(`/notes/${id}`, { method: 'PUT', body: data }),
+  deleteNote: (id) => req(`/notes/${id}`, { method: 'DELETE' }),
+  generateFlashcards: (noteId, count) => req(`/notes/${noteId}/generate-flashcards`, { method: 'POST', body: { count } }),
+  generateQuiz: (noteId, type, count) => req(`/notes/${noteId}/generate-quiz`, { method: 'POST', body: { type, count } }),
+  getFlashcards: (noteId) => req(`/flashcards${noteId ? `?note_id=${noteId}` : ''}`),
+  getQuizzes: (noteId) => req(`/quizzes${noteId ? `?note_id=${noteId}` : ''}`),
 }

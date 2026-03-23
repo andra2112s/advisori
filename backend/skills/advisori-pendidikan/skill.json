@@ -1,0 +1,16 @@
+{
+  "id": "advisori-pendidikan",
+  "name": "Pendidikan & Karir",
+  "emoji": "🎓",
+  "category": "career",
+  "tier": "free",
+  "description": "Konsultan pendidikan dan karir - S2, beasiswa, wirausaha, negosiasi gaji",
+  "author": "system",
+  "version": "1.0.0",
+  "keywords": ["s2","beasiswa","kuliah","magister","doktor","karir","kerja","gaji","negoisasi","resign","startup","bisnis","usaha","wirausaha","entrepreneur","pitch","pendanaan","validasi","ide bisnis","pivot","freelance","remote work","quiet quitting"],
+  "tools": [],
+  "config": {
+    "streaming": false,
+    "webSearch": true
+  }
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background blob -->
+  <ellipse cx="50" cy="55" rx="35" ry="30" fill="#E8F5E9"/>
+  <!-- Body (chibi style) -->
+  <circle cx="50" cy="45" r="28" fill="#4CAF50"/>
+  <circle cx="50" cy="45" r="24" fill="#81C784"/>
+  <!-- Eyes -->
+  <circle cx="42" cy="42" r="4" fill="#1a1a2e"/>
+  <circle cx="58" cy="42" r="4" fill="#1a1a2e"/>
+  <circle cx="43" cy="41" r="1.5" fill="white"/>
+  <circle cx="59" cy="41" r="1.5" fill="white"/>
+  <!-- Cheeks -->
+  <circle cx="36" cy="48" r="4" fill="#FFAB91" opacity="0.6"/>
+  <circle cx="64" cy="48" r="4" fill="#FFAB91" opacity="0.6"/>
+  <!-- Smile -->
+  <path d="M44 52 Q50 58 56 52" stroke="#1a1a2e" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Note paper -->
+  <rect x="30" y="60" width="25" height="20" rx="3" fill="white" stroke="#4CAF50" stroke-width="2"/>
+  <line x1="34" y1="66" x2="50" y2="66" stroke="#E0E0E0" stroke-width="2"/>
+  <line x1="34" y1="72" x2="48" y2="72" stroke="#E0E0E0" stroke-width="2"/>
+  <!-- Pencil -->
+  <rect x="60" y="55" width="20" height="6" rx="2" fill="#FFC107" transform="rotate(-30 70 58)"/>
+  <polygon points="75,52 80,50 78,56" fill="#FF7043" transform="rotate(-30 77 53)"/>
+</svg>

@@ -175,6 +175,8 @@ app.register(shopRoutes,     { prefix: '/api/shop' });
 app.register(webhookRoutes,  { prefix: '/api/webhook' });
 app.register(botRoutes,      { prefix: '/api/bots' });
 app.register(channelsRoutes, { prefix: '/api/channels' });
+import notesRoutes from './routes/notes.js';
+app.register(notesRoutes,    { prefix: '/api/notes' });
 
 // Health check
 app.get('/health', async () => ({ status: 'ok', ts: Date.now() }));

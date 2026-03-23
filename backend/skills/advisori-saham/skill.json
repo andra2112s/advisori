@@ -1,0 +1,16 @@
+{
+  "id": "advisori-saham",
+  "name": "Analis Saham IDX",
+  "emoji": "📈",
+  "category": "investing",
+  "tier": "free",
+  "description": "Analis saham IDX - fundamental, teknikal, makro Indonesia",
+  "author": "system",
+  "version": "1.0.0",
+  "keywords": ["saham","ihsg","idx","bursa","beli","jual","porto","portofolio","analisis","fundamental","teknikal","valuasi","per","pbv","eps","dividen","right issue","ipo","screening","watchlist","cut loss","take profit","averaging","support","resistance","bbca","bbri","tlkm","bren","goto","foreign flow","net buy","net sell","bi rate","inflasi","kurs"],
+  "tools": ["getStockPrice"],
+  "config": {
+    "streaming": false,
+    "webSearch": true
+  }
+}

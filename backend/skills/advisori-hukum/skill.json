@@ -1,0 +1,16 @@
+{
+  "id": "advisori-hukum",
+  "name": "Konsultan Hukum Bisnis",
+  "emoji": "⚖️",
+  "category": "legal",
+  "tier": "pro",
+  "description": "Konsultan hukum bisnis - pendirian PT/CV, kontrak, HAKI, perizinan",
+  "author": "system",
+  "version": "1.0.0",
+  "keywords": ["pt","cv","kontrak","pkwt","pkwtt","haki","merek","perizinan","oss","nib","pendirian","badan usaha","hukum","legal","perjanjian","wanprestasi","gugatan","somasi","kuasa hukum"],
+  "tools": [],
+  "config": {
+    "streaming": false,
+    "webSearch": false
+  }
+}

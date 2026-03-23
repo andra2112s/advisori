@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background blob -->
+  <ellipse cx="50" cy="55" rx="35" ry="30" fill="#E8EAF6"/>
+  <!-- Body -->
+  <circle cx="50" cy="45" r="28" fill="#3F51B5"/>
+  <circle cx="50" cy="45" r="24" fill="#7986CB"/>
+  <!-- Eyes -->
+  <circle cx="42" cy="42" r="4" fill="#1a1a2e"/>
+  <circle cx="58" cy="42" r="4" fill="#1a1a2e"/>
+  <circle cx="43" cy="41" r="1.5" fill="white"/>
+  <circle cx="59" cy="41" r="1.5" fill="white"/>
+  <!-- Cheeks -->
+  <circle cx="36" cy="48" r="4" fill="#FFAB91" opacity="0.6"/>
+  <circle cx="64" cy="48" r="4" fill="#FFAB91" opacity="0.6"/>
+  <!-- Smile -->
+  <path d="M44 52 Q50 58 56 52" stroke="#1a1a2e" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Cards stack -->
+  <rect x="22" y="58" width="30" height="20" rx="3" fill="white" stroke="#7986CB" stroke-width="2" transform="rotate(-10 37 68)"/>
+  <rect x="28" y="56" width="30" height="20" rx="3" fill="white" stroke="#7986CB" stroke-width="2" transform="rotate(5 43 66)"/>
+  <rect x="32" y="54" width="30" height="20" rx="3" fill="white" stroke="#7986CB" stroke-width="2"/>
+  <!-- Check mark -->
+  <path d="M42 64 L46 68 L54 60" stroke="#4CAF50" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

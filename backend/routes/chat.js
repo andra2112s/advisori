@@ -1,6 +1,7 @@
 import { chat } from '../services/ai.js';
 import { supabase } from '../config.js';
 import { HeartbeatService } from '../services/heartbeatService.js';
+import { swarmPredict, shouldTriggerMiroFish, getMiroFishAnalysts } from '../services/mirofish.js';
 
 export default async function chatRoutes(app) {
 
@@ -204,5 +205,79 @@ export default async function chatRoutes(app) {
       tier,
       remaining: Math.max(0, limits[tier] - (count || 0)),
     });
+  });
+
+  // ── Upload image for chat ─────────────────────────────
+  app.post('/upload-image', {
+    preHandler: [app.authenticate],
+  }, async (req, reply) => {
+    try {
+      const { image } = req.body;
+      
+      if (!image) {
+        return reply.status(400).send({ error: 'Image required' });
+      }
+
+      // Decode base64 image
+      const buffer = Buffer.from(image, 'base64');
+      const fileName = `${req.user.id}_${Date.now()}.jpg`;
+      
+      console.log('[Upload] Uploading image:', fileName, 'size:', buffer.length);
+      
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('chat-images')
+        .upload(fileName, buffer, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('[Upload] Supabase error:', error);
+        return reply.status(500).send({ error: 'Failed to upload image', details: error.message });
+      }
+
+      console.log('[Upload] Success:', data);
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('chat-images')
+        .getPublicUrl(fileName);
+
+      reply.send({ 
+        url: urlData.publicUrl,
+        filename: fileName 
+      });
+    } catch (err) {
+      console.error('[Upload] Exception:', err);
+      reply.status(500).send({ error: 'Failed to upload image', details: err.message });
+    }
+  });
+
+  // ── MiroFish Analysis ───────────────────────────────
+  app.post('/mirofish', {
+    preHandler: [app.authenticate],
+  }, async (req, reply) => {
+    const { query } = req.body;
+    const tier = req.user.tier || 'free';
+    
+    if (!shouldTriggerMiroFish(query, tier)) {
+      return reply.status(403).send({ error: 'MiroFish not available for your tier' });
+    }
+
+    try {
+      const analysts = getMiroFishAnalysts(tier);
+      const result = await swarmPredict({
+        query,
+        userId: req.user.id,
+        personaCount: analysts,
+        tier,
+      });
+
+      reply.send(result);
+    } catch (err) {
+      console.error('[MiroFish] Error:', err);
+      reply.status(500).send({ error: err.message || 'MiroFish analysis failed' });
+    }
   });
 }
