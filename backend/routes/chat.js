@@ -33,7 +33,7 @@ export default async function chatRoutes(app) {
     reply.raw.setHeader('X-Accel-Buffering', 'no');
 
     try {
-      const { stream, activeSkill } = await chat({
+      const { stream, activeSkill, content } = await chat({
         userId: req.user.id,
         message,
         advisorId,
@@ -46,13 +46,26 @@ export default async function chatRoutes(app) {
         skill: { id: activeSkill.id, name: activeSkill.name, emoji: activeSkill.emoji }
       })}\n\n`);
 
-      // Stream token satu per satu
       let fullContent = '';
-      for await (const chunk of stream) {
-        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-          const text = chunk.delta.text;
-          fullContent += text;
-          reply.raw.write(`data: ${JSON.stringify({ type: 'token', text })}\n\n`);
+      
+      // Check if we have a stream (Claude) or content (Z.ai)
+      if (stream) {
+        // Claude streaming - iterate through chunks
+        for await (const chunk of stream) {
+          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+            const text = chunk.delta.text;
+            fullContent += text;
+            reply.raw.write(`data: ${JSON.stringify({ type: 'token', text })}\n\n`);
+          }
+        }
+      } else if (content) {
+        // Z.ai non-streaming - send content in chunks
+        const chars = content.split('');
+        for (const char of chars) {
+          fullContent += char;
+          reply.raw.write(`data: ${JSON.stringify({ type: 'token', text: char })}\n\n`);
+          // Small delay for effect
+          await new Promise(r => setTimeout(r, 5));
         }
       }
 
@@ -66,14 +79,13 @@ export default async function chatRoutes(app) {
       });
 
       // Check if user should receive heartbeat (after chat)
-      // This is a good time since user is actively engaged
       setTimeout(async () => {
         try {
           await HeartbeatService.sendHeartbeat(req.user.id, 'web');
         } catch (err) {
           console.log('Heartbeat check failed:', err.message);
         }
-      }, 5000); // Check 5 seconds after chat
+      }, 5000);
 
       reply.raw.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       reply.raw.end();
