@@ -366,9 +366,23 @@ export default function Channels() {
 
             {connections.telegram?.connected ? (
               <div>
-                <p style={{ fontSize: 14, color: 'var(--ink-3)', marginBottom: 16 }}>
+                <p style={{ fontSize: 14, color: 'var(--ink-3)', marginBottom: 8 }}>
                   Telegram bot is active and listening
                 </p>
+                <div style={{ 
+                  background: 'var(--bg-2)', 
+                  padding: '8px 12px', 
+                  borderRadius: 8, 
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <span style={{ fontSize: 14 }}>🤖</span>
+                  <span style={{ fontSize: 14, color: 'var(--gold)' }}>
+                    @{connections.telegram?.credentials?.botUsername || 'Bot'}
+                  </span>
+                </div>
                 <button className="disconnect-btn" onClick={() => handleDisconnect('telegram')}>
                   Disconnect
                 </button>

@@ -30,7 +30,7 @@ class TelegramChannel {
       bot.start();
 
       this.bots.set(userId, bot);
-      await this.updateConnectionStatus(userId, true, { botToken });
+      await this.updateConnectionStatus(userId, true, { botToken, botUsername: me.username });
 
       return { success: true, message: 'Connected', botUsername: me.username };
     } catch (error) {
