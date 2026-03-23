@@ -108,7 +108,7 @@ async function chatWithZAI(message, context, systemPrompt, history, useSearch = 
   const data = await response.json();
 
   return {
-    content: data.choices[0]?.message?.content || 'No response from Z.ai',
+    content: data.choices[0]?.message?.content || 'Maaf, saya butuh waktu lebih lama. Coba lagi.',
     usage: {
       input_tokens: data.usage?.prompt_tokens || 0,
       output_tokens: data.usage?.completion_tokens || 0,
@@ -118,14 +118,21 @@ async function chatWithZAI(message, context, systemPrompt, history, useSearch = 
 }
 
 async function loadUserContext(userId) {
-  const { data: user } = await supabase
+  const { data: user, error: userError } = await supabase
     .from('users').select('*, souls(*)').eq('id', userId).single();
+  
+  if (userError) {
+    app.log.error('Error loading user:', userError);
+  }
+  
+  const soul = user?.souls ? (Array.isArray(user.souls) ? user.souls[0] : user.souls) : null;
+  
   const { data: activeSubs } = await supabase
     .from('subscriptions').select('skill_id')
     .eq('user_id', userId).eq('status', 'active');
   return {
     user,
-    soul: user?.souls?.[0] || null,
+    soul: soul,
     activeSkills: ['advisori-pajak','advisori-saham', ...(activeSubs?.map(s => s.skill_id) || [])],
     tier: user?.tier || 'free',
   };
@@ -235,7 +242,7 @@ async function chatWithClaude(message, context, systemPrompt, history, useSearch
     });
 
     return {
-      content: response.content[0]?.text || 'No response from Claude',
+      content: response.content[0]?.text || 'Maaf, saya butuh waktu lebih lama. Coba lagi.',
       usage: {
         input_tokens: response.usage?.input_tokens || 0,
         output_tokens: response.usage?.output_tokens || 0,
